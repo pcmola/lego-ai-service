@@ -1,5 +1,7 @@
 # 레고 창작 AI Agent (Multi-Agent + RAG + Streamlit)
 
+<img src="./images/03. InitResult.png" width="1007">
+
 레고 창작 설계용 Multi-Agent 기반 에이전트 프로젝트입니다.  
 사용자가 만들고 싶은 레고 작품의 컨셉·크기·용도 등을 입력하면, 여러 에이전트가 협업하여 **요구사항 분석 → 구조 설계 → 결과 정리**까지 자동으로 수행합니다.
 
@@ -183,7 +185,7 @@ Azure OpenAI 환경 설정 관리 모듈입니다.
 
 ---
 
-## 6. 환경변수 설정 (.env 예시)
+## 📌 6. 환경변수 설정 (.env 예시)
 
 Azure OpenAI를 사용하기 위한 환경변수입니다.  
 `.env.example`을 복사하여 `.env` 파일을 만들고, 실제 값으로 수정해 주세요.
@@ -201,9 +203,9 @@ AOAI_API_VERSION=2024-02-01
 
 ---
 
-## 7. 실행 방법
+## 📌 7. 실행 방법
 
-### ▶ 로컬 실행
+### 🔹 로컬 실행
 
 ```bash
 git clone https://github.com/pcmola/lego-ai-service.git
@@ -223,7 +225,7 @@ streamlit run app/main.py
 -Streamlit 실행 후 접속 URL:
 ➡ http://localhost:8501
 
-### ▶ Docker 실행
+### 🔹 Docker 실행
 
 ```bash
 docker build -t lego-agent .
@@ -233,7 +235,7 @@ docker run -it --rm -p 8501:8501 --env-file .env lego-agent
 
 ---
 
-## 8. Azure OpenAI 연결 테스트
+## 📌 8. Azure OpenAI 연결 테스트
 
 Azure OpenAI 설정이 정상적으로 적용되었는지 확인하려면 아래 명령을 실행하세요.
 
@@ -247,7 +249,7 @@ python test_azure_openai.py
   - Azure OpenAI 리소스에서 해당 모델이 정상적으로 배포되었는지 확인
   - 네트워크 또는 권한 문제 여부 점검
 
-## 9. TODO (향후 개선 예정)
+## 📌 9. TODO (향후 개선 예정)
 
 - [ ] RAG 지식 문서 확장
 - [ ] LEGO 브릭(Parts) 리스트 자동 생성 기능
@@ -256,7 +258,7 @@ python test_azure_openai.py
 - [ ] 이미지 기반 설계 보조 기능 (예: 사진 입력 → 구조 분석)
 - [ ] Streamlit UI 고도화 (단계별 화면, 히스토리 관리 등)
 
-## 10. 문의
+## 📌 10. 문의
 
 프로젝트 관련 문의 또는 협업 제안은 아래 연락처를 통해 가능합니다.
 
@@ -265,12 +267,8 @@ python test_azure_openai.py
 - **Blog:** http://pcmola.com
 - **Email:** pcmola@naver.com
 
-## 12. 결과 예시
+## 📌 11. 결과 예시
 
-### 레고 창작 Agent 최초 실행 화면
-
-<img src="./images/03. InitResult.png" width="1007">
-
-### 레고 창작 Agent 결과 화면
+### 🔹레고 창작 Agent 결과 화면
 
 <img src="./images/04. AI-Result.png" width="1232">
