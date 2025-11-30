@@ -2,6 +2,14 @@
 
 레고 창작 설계용 Multi-Agent 에이전트입니다.
 
+## 사용자 흐름 다이어그램
+
+<img src="./images/01. UserFlowDiagram.png" width="411">
+
+## 서비스 아키텍처 다이어그램
+
+<img src="./images/02. ServiceArchitectureDiagram.png" width="1394">
+
 ## 구조
 
 - app/main.py : Streamlit 진입점
@@ -32,9 +40,10 @@ docker build -t lego-agent .
 docker run -it --rm -p 8501:8501 --env-file .env lego-agent
 ```
 
-## 이미지
+# 레고 창작 Agent 최초 실행 화면
 
-<img src="./images/01. UserFlowDiagram.png" width="411">
-<img src="./images/02. ServiceArchitectureDiagram.png" width="1394">
 <img src="./images/03. InitResult.png" width="1007">
-<img src="./images/04. AI-Result.png" width="1007">
+
+# 레고 창작 Agent 결과 화면
+
+<img src="./images/04. AI-Result.png" width="976">
