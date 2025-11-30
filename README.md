@@ -79,7 +79,7 @@ flowchart TB
     V([📦 Chroma VectorStore<br/>retrieval/vector_store.py]):::store
     L([💬 Azure OpenAI<br/>LLM]):::service
 
-    K["📚 레고 지식 문서<br/>retrieval/knowledge (md 파일들)"]:::knowledge
+    K["📚 레고 지식 문서<br/>retrieval/knowledge<br/> (md 파일들)"]:::knowledge
 
     %% ───────── 플로우 ─────────
     U --> A --> B
