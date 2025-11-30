@@ -62,12 +62,10 @@ flowchart TD
 ## 📌 3. 서비스 아키텍처
 
 ```mermaid
-%%{init: {"theme":"dark"}}%%
+%%{init: {"theme":"neutral"}}%%
 flowchart TB
-    %% ───────── 레이아웃: 위→아래 (TB) ─────────
-    %% 아이콘 + 컬러 클래스로 역할 구분
 
-    %% 노드 정의
+    %% ───────── 노드 정의 ─────────
     U([👤 사용자 브라우저]):::client
 
     A([🖥️ Streamlit 앱<br/>app/main.py]):::ui
@@ -79,15 +77,12 @@ flowchart TB
 
     E([💠 Azure OpenAI<br/>Embeddings]):::service
     V([📦 Chroma VectorStore<br/>retrieval/vector_store.py]):::store
-
     L([💬 Azure OpenAI<br/>LLM]):::service
 
-    %% ❗ 문제되던 노드: 단순 텍스트 + 큰따옴표로 변경
     K["📚 레고 지식 문서<br/>retrieval/knowledge (md 파일들)"]:::knowledge
 
     %% ───────── 플로우 ─────────
     U --> A --> B
-
     B --> R
     B --> D
     B --> F
@@ -103,7 +98,7 @@ flowchart TB
 
     V --> K
 
-    %% ───────── 그룹(섹션) 느낌 내기 ─────────
+    %% ───────── 그룹 ─────────
     subgraph FRONTEND[프론트엔드]
         U
         A
@@ -123,20 +118,20 @@ flowchart TB
         K
     end
 
-    %% ───────── 스타일 정의 (아이콘 컬러 라벨링) ─────────
-    classDef client fill:#020617,stroke:#64748b,stroke-width:2px,color:#e5e7eb;
-    classDef ui fill:#1d4ed8,stroke:#93c5fd,stroke-width:2px,color:#e5e7eb;
-    classDef orchestrator fill:#7c3aed,stroke:#a855f7,stroke-width:2px,color:#f9fafb;
+    %% ───────── 스타일 ─────────
+    classDef client fill:#ffffff,stroke:#777,color:#111;
+    classDef ui fill:#e8f0fe,stroke:#4e73df,color:#111;
+    classDef orchestrator fill:#ede7f6,stroke:#8e24aa,color:#111;
 
-    classDef agent fill:#16a34a,stroke:#4ade80,stroke-width:2px,color:#ecfdf5;
-    classDef service fill:#be185d,stroke:#f472b6,stroke-width:2px,color:#fdf2f8;
-    classDef store fill:#b45309,stroke:#fbbf24,stroke-width:2px,color:#fffbeb;
-    classDef knowledge fill:#0f766e,stroke:#2dd4bf,stroke-width:2px,color:#ecfeff;
+    classDef agent fill:#e8f5e9,stroke:#43a047,color:#111;
+    classDef service fill:#ffebee,stroke:#c62828,color:#111;
+    classDef store fill:#fff8e1,stroke:#f9a825,color:#111;
+    classDef knowledge fill:#e0f7fa,stroke:#00838f,color:#111;
 
-    %% 그룹 박스 라벨 스타일
-    style FRONTEND fill:#020617,stroke:#475569,stroke-width:1px,color:#e5e7eb;
-    style WORKFLOW fill:#020617,stroke:#4b5563,stroke-width:1px,color:#e5e7eb;
-    style BACKEND fill:#020617,stroke:#4b5563,stroke-width:1px,color:#e5e7eb;
+    style FRONTEND fill:#f5f5f5,stroke:#bdbdbd,color:#444;
+    style WORKFLOW fill:#f5f5f5,stroke:#bdbdbd,color:#444;
+    style BACKEND fill:#f5f5f5,stroke:#bdbdbd,color:#444;
+
 
 ```
 
