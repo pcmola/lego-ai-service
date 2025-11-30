@@ -386,4 +386,4 @@ python test_azure_openai.py
 
 <img src="./images/04.AI-Result.png" width="1232">
 
-**[그림 4] AI가 생성한 최종 레고 설계 결과 화면입니다.**
+**[그림 2] AI가 생성한 최종 레고 설계 결과 화면입니다.**
