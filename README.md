@@ -1,6 +1,6 @@
 # 레고 창작 AI Agent (Multi-Agent + RAG + Streamlit)
 
-<img src="./images/03.InitResult.png" width="1007">
+<img src="./images/01.InitResult.png" width="1007">
 
 **[그림 1] 레고 창작 Agent의 초기 생성 결과 화면입니다.**
 
