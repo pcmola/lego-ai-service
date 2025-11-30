@@ -2,7 +2,7 @@
 
 <img src="./images/01.InitResult.png" width="1007">
 
-**[그림 1] 레고 창작 Agent의 초기 생성 결과 화면입니다.**
+**[그림 1] 레고 창작 Agent의 초기 생성 결과 화면**
 
 레고 창작 설계용 Multi-Agent 기반 에이전트 프로젝트입니다.  
 사용자가 만들고 싶은 레고 작품의 컨셉·크기·용도 등을 입력하면, 여러 에이전트가 협업하여 <br/>
@@ -386,4 +386,4 @@ python test_azure_openai.py
 
 <img src="./images/02.AI-Result.png" width="1232">
 
-**[그림 2] AI가 생성한 최종 레고 설계 결과 화면입니다.**
+**[그림 2] AI가 생성한 최종 레고 설계 결과 화면**
