@@ -61,42 +61,81 @@ flowchart TD
 
 ## 📌 3. 서비스 아키텍처
 
-```mermaid
-%%{init: {'theme':'dark'}}%%
-flowchart LR
-    A[사용자 브라우저] --> B[📄 Streamlit 앱 app/main.py]
-    B --> C[🧠 LangGraph App workflow/graph.py]
+```mermaid%%{init: {"theme":"dark"}}%%
+flowchart TB
+    %% ───────── 레이아웃: 위→아래 (TB) ─────────
+    %% 아이콘 + 컬러 클래스로 역할 구분
 
-    C --> D[🔍 RequirementsAgent]
-    C --> E[🎨 DesignAgent]
-    C --> F[✨ RefinerAgent]
+    %% 노드 정의
+    U([👤 사용자 브라우저]):::client
 
-    D -- 임베딩 요청 --> G[💠 Azure OpenAI Embeddings]
-    D -- RAG 검색 --> H[📦 Chroma VectorStore retrieval/vector_store.py]
+    A([🖥️ Streamlit 앱<br/>app/main.py]):::ui
+    B([🧠 LangGraph App<br/>workflow/graph.py]):::orchestrator
 
-    E -- Chat Completion --> I[💬 Azure OpenAI LLM]
-    E -- RAG 검색 --> H
+    R([🔍 RequirementsAgent]):::agent
+    D([🎨 DesignAgent]):::agent
+    F([✨ RefinerAgent]):::agent
 
-    F -- Chat Completion --> I
-    F -- RAG 검색 --> H
+    E([💠 Azure OpenAI<br/>Embeddings]):::service
+    V([📦 Chroma VectorStore<br/>retrieval/vector_store.py]):::store
 
-    H --> J[(📚 레고 지식 문서<br>retrieval/knowledge .md)]
+    L([💬 Azure OpenAI<br/>LLM]):::service
 
+    %% ❗ 문제되던 노드: 단순 텍스트 + 큰따옴표로 변경
+    K["📚 레고 지식 문서<br/>retrieval/knowledge (md 파일들)"]:::knowledge
 
-    %% 스타일 지정
-    style A fill:#34495e,stroke:#2c3e50,stroke-width:2px,color:#ecf0f1
-    style B fill:#8e44ad,stroke:#5e3370,stroke-width:2px,color:#fff
-    style C fill:#f39c12,stroke:#d68910,stroke-width:2px,color:#000
+    %% ───────── 플로우 ─────────
+    U --> A --> B
 
-    style D fill:#2ecc71,stroke:#27ae60,stroke-width:2px,color:#000
-    style E fill:#f1c40f,stroke:#d4ac0d,stroke-width:2px,color:#000
-    style F fill:#1abc9c,stroke:#16a085,stroke-width:2px,color:#000
+    B --> R
+    B --> D
+    B --> F
 
-    style G fill:#e84393,stroke:#c2185b,stroke-width:2px,color:#fff
-    style I fill:#e74c3c,stroke:#922b21,stroke-width:2px,color:#fff
+    R -- "임베딩 요청" --> E
+    R -- "RAG 검색" --> V
 
-    style H fill:#f7dc6f,stroke:#d4ac0d,stroke-width:2px,color:#000
-    style J fill:#e67e22,stroke:#a04000,stroke-width:2px,color:#fff
+    D -- "Chat Completion" --> L
+    D -- "RAG 검색" --> V
+
+    F -- "Chat Completion" --> L
+    F -- "RAG 검색" --> V
+
+    V --> K
+
+    %% ───────── 그룹(섹션) 느낌 내기 ─────────
+    subgraph FRONTEND[프론트엔드]
+        U
+        A
+    end
+
+    subgraph WORKFLOW[LangGraph 워크플로우]
+        B
+        R
+        D
+        F
+    end
+
+    subgraph BACKEND[백엔드 · AI 서비스]
+        E
+        L
+        V
+        K
+    end
+
+    %% ───────── 스타일 정의 (아이콘 컬러 라벨링) ─────────
+    classDef client fill:#020617,stroke:#64748b,stroke-width:2px,color:#e5e7eb;
+    classDef ui fill:#1d4ed8,stroke:#93c5fd,stroke-width:2px,color:#e5e7eb;
+    classDef orchestrator fill:#7c3aed,stroke:#a855f7,stroke-width:2px,color:#f9fafb;
+
+    classDef agent fill:#16a34a,stroke:#4ade80,stroke-width:2px,color:#ecfdf5;
+    classDef service fill:#be185d,stroke:#f472b6,stroke-width:2px,color:#fdf2f8;
+    classDef store fill:#b45309,stroke:#fbbf24,stroke-width:2px,color:#fffbeb;
+    classDef knowledge fill:#0f766e,stroke:#2dd4bf,stroke-width:2px,color:#ecfeff;
+
+    %% 그룹 박스 라벨 스타일
+    style FRONTEND fill:#020617,stroke:#475569,stroke-width:1px,color:#e5e7eb;
+    style WORKFLOW fill:#020617,stroke:#4b5563,stroke-width:1px,color:#e5e7eb;
+    style BACKEND fill:#020617,stroke:#4b5563,stroke-width:1px,color:#e5e7eb;
 
 ```
 
