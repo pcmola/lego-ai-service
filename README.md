@@ -34,9 +34,28 @@
 
 ## 📌 2. 사용자 흐름 (User Flow)
 
-<img src="./images/01.UserFlowDiagram.png" width="300">
+```mermaid
+flowchart TD
+    Input["🖱️ 사용자 입력<br/>- 사이드바 설정<br/>- 레고 아이디어 텍스트"]
+    Start["🚀 LangGraph 시작"]
+    Agent1["🔍 요구사항 분석 에이전트<br/>(RequirementsAgent)"]
+    Agent2["🎨 설계 생성 에이전트<br/>(DesignAgent)"]
+    Agent3["✨ 정리 에이전트<br/>(RefinerAgent)"]
+    Output["✅ 최종 설계 결과 출력<br/>(Streamlit 화면)"]
 
-**[그림 2] 레고 창작 Agent의 사용자 흐름(User Flow) 다이어그램입니다.**
+    Input --> Start
+    Start --> Agent1
+    Agent1 --> Agent2
+    Agent2 --> Agent3
+    Agent3 --> Output
+
+    style Input fill:#d4e9f7,stroke:#5dade2,stroke-width:3px,color:#000000
+    style Start fill:#ffe4cc,stroke:#ff9933,stroke-width:3px,color:#000000
+    style Agent1 fill:#e8daef,stroke:#9b59b6,stroke-width:3px,color:#000000
+    style Agent2 fill:#d5f4e6,stroke:#52b788,stroke-width:3px,color:#000000
+    style Agent3 fill:#fff4cc,stroke:#ffcc00,stroke-width:3px,color:#000000
+    style Output fill:#ffcccc,stroke:#e74c3c,stroke-width:3px,color:#000000
+```
 
 ---
 
