@@ -4,7 +4,7 @@
 
 ## 사용자 흐름 다이어그램
 
-<img src="./images/01. UserFlowDiagram.png" width="411">
+<img src="./images/01. UserFlowDiagram.png" width="300">
 
 ## 서비스 아키텍처 다이어그램
 
@@ -46,4 +46,4 @@ docker run -it --rm -p 8501:8501 --env-file .env lego-agent
 
 ## 레고 창작 Agent 결과 화면
 
-<img src="./images/04. AI-Result3.png" width="1232">
+<img src="./images/04. AI-Result.png" width="1232">
