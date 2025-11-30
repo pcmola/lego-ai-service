@@ -1,6 +1,6 @@
 # 레고 창작 AI Agent (Multi-Agent + RAG + Streamlit)
 
-<img src="./images/03. InitResult.png" width="1007">
+<img src="./images/03.InitResult.png" width="1007">
 
 레고 창작 설계용 Multi-Agent 기반 에이전트 프로젝트입니다.  
 사용자가 만들고 싶은 레고 작품의 컨셉·크기·용도 등을 입력하면, 여러 에이전트가 협업하여 **요구사항 분석 → 구조 설계 → 결과 정리**까지 자동으로 수행합니다.
@@ -31,13 +31,13 @@
 
 ## 📌 2. 사용자 흐름 (User Flow)
 
-<img src="./images/01. UserFlowDiagram.png" width="300">
+<img src="./images/01.UserFlowDiagram.png" width="300">
 
 ---
 
 ## 📌 3. 서비스 아키텍처
 
-<img src="./images/02. ServiceArchitectureDiagram.png" width="1394">
+<img src="./images/02.ServiceArchitectureDiagram.png" width="1394">
 
 - **Streamlit UI**
 - **LangGraph Multi-Agent Orchestrator**
@@ -272,4 +272,4 @@ python test_azure_openai.py
 
 ### 🔹레고 창작 Agent 결과 화면
 
-<img src="./images/04. AI-Result.png" width="1232">
+<img src="./images/04.AI-Result.png" width="1232">
