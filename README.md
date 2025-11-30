@@ -40,10 +40,10 @@ docker build -t lego-agent .
 docker run -it --rm -p 8501:8501 --env-file .env lego-agent
 ```
 
-# 레고 창작 Agent 최초 실행 화면
+## 레고 창작 Agent 최초 실행 화면
 
 <img src="./images/03. InitResult.png" width="1007">
 
-# 레고 창작 Agent 결과 화면
+## 레고 창작 Agent 결과 화면
 
-<img src="./images/04. AI-Result.png" width="976">
+<img src="./images/04. AI-Result.png" width="1232">
