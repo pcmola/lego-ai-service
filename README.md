@@ -61,9 +61,44 @@ flowchart TD
 
 ## 📌 3. 서비스 아키텍처
 
-<img src="./images/02.ServiceArchitectureDiagram.png" width="1394">
+```mermaid
+%%{init: {'theme':'dark'}}%%
+flowchart LR
+    A[사용자 브라우저] --> B[📄 Streamlit 앱 app/main.py]
+    B --> C[🧠 LangGraph App workflow/graph.py]
 
-**[그림 3] 전체 시스템 구성(Service Architecture) 다이어그램입니다.**
+    C --> D[🔍 RequirementsAgent]
+    C --> E[🎨 DesignAgent]
+    C --> F[✨ RefinerAgent]
+
+    D -- 임베딩 요청 --> G[💠 Azure OpenAI Embeddings]
+    D -- RAG 검색 --> H[📦 Chroma VectorStore retrieval/vector_store.py]
+
+    E -- Chat Completion --> I[💬 Azure OpenAI LLM]
+    E -- RAG 검색 --> H
+
+    F -- Chat Completion --> I
+    F -- RAG 검색 --> H
+
+    H --> J[(📚 레고 지식 문서<br>retrieval/knowledge .md)]
+
+
+    %% 스타일 지정
+    style A fill:#34495e,stroke:#2c3e50,stroke-width:2px,color:#ecf0f1
+    style B fill:#8e44ad,stroke:#5e3370,stroke-width:2px,color:#fff
+    style C fill:#f39c12,stroke:#d68910,stroke-width:2px,color:#000
+
+    style D fill:#2ecc71,stroke:#27ae60,stroke-width:2px,color:#000
+    style E fill:#f1c40f,stroke:#d4ac0d,stroke-width:2px,color:#000
+    style F fill:#1abc9c,stroke:#16a085,stroke-width:2px,color:#000
+
+    style G fill:#e84393,stroke:#c2185b,stroke-width:2px,color:#fff
+    style I fill:#e74c3c,stroke:#922b21,stroke-width:2px,color:#fff
+
+    style H fill:#f7dc6f,stroke:#d4ac0d,stroke-width:2px,color:#000
+    style J fill:#e67e22,stroke:#a04000,stroke-width:2px,color:#fff
+
+```
 
 - **Streamlit UI**
 - **LangGraph Multi-Agent Orchestrator**
