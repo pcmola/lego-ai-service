@@ -222,8 +222,9 @@ cp .env.example .env
 streamlit run app/main.py
 ```
 
--Streamlit 실행 후 접속 URL:
-➡ http://localhost:8501
+Streamlit 앱 실행 후 브라우저에서 아래 주소로 접속합니다.
+
+- ➡ <http://localhost:8501>
 
 ### 🔹 Docker 실행
 
