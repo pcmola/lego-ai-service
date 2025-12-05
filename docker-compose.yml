@@ -1,0 +1,17 @@
+version: "3.9"
+
+services:
+  lego-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: lego-agent
+    ports:
+      - "8501:8501"
+    env_file:
+      - .env
+    volumes:
+      - ./app:/app/app # 🔥 코드 자동 반영 (hot reload)
+      - ./retrieval:/app/retrieval
+    command: streamlit run app/main.py --server.port=8501 --server.address=0.0.0.0
+    restart: unless-stopped
