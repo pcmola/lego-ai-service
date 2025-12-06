@@ -1,153 +1,184 @@
-from __future__ import annotations
+import re
+from typing import List, Dict, Any
 
-import html
-import logging
-from typing import List, Dict, Any, Optional
-
-from utils.rebrickable_client import RebrickableClient, RebrickablePart
-
-logger = logging.getLogger(__name__)
-
-
-def _safe_get(d: Dict[str, Any], key: str, default: str = "-") -> str:
-    val = d.get(key)
-    if val is None:
-        return default
-    s = str(val).strip()
-    return s if s else default
-
-
-def _lookup_part_with_rebrickable(
-    row: Dict[str, Any],
-    client: Optional[RebrickableClient],
-) -> Dict[str, Any]:
-    result = {
-        "part_num": "-",
-        "part_name": "-",
-        "image_html": "-",
-    }
-
-    if client is None:
-        logger.warning(
-            "[brick_table] RebrickableClient 가 주어지지 않아 "
-            "부품 정보가 '-' 로 대체됩니다."
-        )
-        return result
-
-    raw_part_num = _safe_get(row, "part_num", "").replace(" ", "")
-    if not raw_part_num:
-        logger.warning(
-            "[brick_table] row 에 part_num 이 없어 Rebrickable 조회를 건너뜁니다. row=%s",
-            row,
-        )
-        return result
-
-    logger.info(
-        "[brick_table] Rebrickable get_part 호출 준비: part_num=%s, row=%s",
-        raw_part_num,
-        row,
-    )
-    part: Optional[RebrickablePart] = client.get_part(raw_part_num)
-
-    if not part:
-        logger.error(
-            "[brick_table] Rebrickable get_part 실패: part_num=%s → '-', '-', '-' 로 대체",
-            raw_part_num,
-        )
-        return result
-
-    image_html = "-"
-    if part.image_url:
-        safe_url = html.escape(part.image_url, quote=True)
-        safe_alt = html.escape(part.name or part.part_num)
-        image_html = (
-            f"<img src='{safe_url}' alt='{safe_alt}' "
-            f"style='max-width:80px; max-height:80px;' />"
-        )
-
-    result["part_num"] = part.part_num or "-"
-    result["part_name"] = part.name or "-"
-    result["image_html"] = image_html
-
-    logger.info(
-        "[brick_table] Rebrickable get_part 결과 매핑: "
-        "input_part_num=%s, mapped_part_num=%s, name=%s, image_url=%s",
-        raw_part_num,
-        result["part_num"],
-        result["part_name"],
-        part.image_url,
-    )
-
-    return result
+from utils.rebrickable_client import RebrickableClient
 
 
 def build_brick_table_html(
-    brick_rows: List[Dict[str, Any]],
-    client: Optional[RebrickableClient] = None,
+    rows: List[Dict[str, Any]],
+    client: RebrickableClient,
 ) -> str:
-    logger.info(
-        "[brick_table] 브릭/부품 제안 테이블 생성 시작. 입력 행 수: %d",
-        len(brick_rows),
-    )
+    """
+    브릭/부품 제안 리스트를 받아 Rebrickable API로 이름/이미지를 채운 HTML 테이블 생성.
 
-    table_html_parts: List[str] = []
-    table_html_parts.append(
-        """
-<table style="border-collapse: collapse; width: 100%; table-layout: fixed;">
-  <thead>
-    <tr>
-      <th style="border: 1px solid #ddd; padding: 8px;">부품 종류</th>
-      <th style="border: 1px solid #ddd; padding: 8px;">부품 번호</th>
-      <th style="border: 1px solid #ddd; padding: 8px;">부품 이름</th>
-      <th style="border: 1px solid #ddd; padding: 8px;">이미지</th>
-      <th style="border: 1px solid #ddd; padding: 8px;">설명 및 용도</th>
-    </tr>
-  </thead>
-  <tbody>
-"""
-    )
+    입력 rows 원소 예시:
+        {
+            "part_type": "회색 2x4, 2x2",
+            "part_num": "3001, 3003",
+            "description": "벽체 쌓기"
+        }
 
-    for idx, row in enumerate(brick_rows):
-        logger.info("[brick_table] 행[%d] 처리 시작: row=%s", idx, row)
+    동작 규칙
+    ----------
+    1) "한 행에 여러 부품 번호"가 들어온 경우 자동으로 여러 행으로 분할
+       예) part_num="3001, 3003" → 두 행으로 나눔
+           - (회색 2x4, 2x2 / 3001 / ...)
+           - (회색 2x4, 2x2 / 3003 / ...)
 
-        part_type = _safe_get(row, "part_type")
-        description = _safe_get(row, "description")
+    2) 컬럼 의미 강제:
+       - 3~6자리 숫자(예: 3001, 3028, 3069b 등)는 **무조건 부품 번호**로 취급
+         (part_type이 숫자이고 part_num이 수량/텍스트면 둘을 스왑)
+       - part_num 안에 남는 텍스트는 색상으로, 수량 단어는 수량으로 보고
+         모두 '설명 및 용도'에 합쳐서 보냄
+       - 최종 표 컬럼:
+           부품 종류 | 부품 번호 | 부품 이름 | 이미지 | 설명 및 용도
+    """
 
-        rebrick_data = _lookup_part_with_rebrickable(row, client)
+    html_rows: List[str] = []
 
-        part_num = rebrick_data["part_num"]
-        part_name = rebrick_data["part_name"]
-        image_html = rebrick_data["image_html"]
+    qty_words = {"다수", "소량", "적당량", "많이", "적게", "여러 개", "여러개", "다양한"}
 
-        part_type_esc = html.escape(part_type)
-        part_num_esc = html.escape(part_num)
-        part_name_esc = html.escape(part_name)
-        description_esc = html.escape(description)
+    for base_row in rows:
+        base_part_type = (base_row.get("part_type") or "").strip()
+        base_raw_part_num = (base_row.get("part_num") or "").strip()
+        base_description = (base_row.get("description") or "").strip()
 
-        row_html = f"""
-    <tr>
-      <td style="border: 1px solid #ddd; padding: 8px;">{part_type_esc}</td>
-      <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">{part_num_esc}</td>
-      <td style="border: 1px solid #ddd; padding: 8px;">{part_name_esc}</td>
-      <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">{image_html}</td>
-      <td style="border: 1px solid #ddd; padding: 8px;">{description_esc}</td>
-    </tr>
-"""
-        table_html_parts.append(row_html)
-
-        logger.info(
-            "[brick_table] 행[%d] 최종 테이블 데이터: "
-            "part_type=%s, part_num=%s, part_name=%s, description=%s",
-            idx,
-            part_type,
-            part_num,
-            part_name,
-            description,
+        # --------------------------------------------------
+        # 0) "한 행에 여러 번호"가 들어온 경우 분할
+        #    예: "3001, 3003" → ["3001", "3003"]
+        #    단, 숫자/알파벳/공백/콤마 외 문자가 없을 때만 '순수 번호 리스트'로 판단
+        # --------------------------------------------------
+        multi_numbers = re.findall(r"\b(\d{3,6}[a-zA-Z]?)\b", base_raw_part_num)
+        is_pure_number_list = (
+            len(multi_numbers) >= 2
+            and re.sub(r"[0-9a-zA-Z ,]", "", base_raw_part_num).strip() == ""
         )
 
-    table_html_parts.append("  </tbody>\\n</table>\\n")
-    full_html = "".join(table_html_parts)
+        if is_pure_number_list:
+            # 여러 부품 번호 → 동일한 part_type / description 으로 행을 여러 개 생성
+            row_variants = [
+                (base_part_type, num, base_description) for num in multi_numbers
+            ]
+        else:
+            # 평소처럼 하나의 행만 사용
+            row_variants = [
+                (base_part_type, base_raw_part_num, base_description),
+            ]
 
-    logger.info("[brick_table] 브릭/부품 제안 테이블 생성 완료. HTML 길이=%d", len(full_html))
+        # --------------------------------------------------
+        # 각 변형 행(row_variant)에 대해 실제 테이블 행 생성
+        # --------------------------------------------------
+        for part_type, raw_part_num, description in row_variants:
+            quantity_info = ""
 
-    return full_html
+            # ----------------------------------------------
+            # 1) part_type 가 사실상 "부품 번호"인 경우 감지해서 스왑
+            #    예: part_type="3028", part_num="1" → 3028은 번호, 1은 수량
+            # ----------------------------------------------
+            part_type_looks_like_num = bool(
+                re.fullmatch(r"\d{3,6}[a-zA-Z]?", part_type)
+            )
+
+            part_num_looks_like_quantity = (
+                raw_part_num in qty_words
+                or bool(re.fullmatch(r"[0-9]{1,2}", raw_part_num))
+            )
+
+            if part_type_looks_like_num and (not raw_part_num or part_num_looks_like_quantity):
+                # part_type 안의 숫자를 진짜 부품 번호로 사용
+                raw_part_num, quantity_info, part_type = part_type, raw_part_num, ""
+
+            # ----------------------------------------------
+            # 2) raw_part_num 에서 진짜 부품 번호와 색상 정보 분리
+            # ----------------------------------------------
+            num_match = re.search(r"\b(\d{3,6}[a-zA-Z]?)\b", raw_part_num)
+            if num_match:
+                part_num = num_match.group(1)
+                # 번호 외에 남은 텍스트는 색상 정보로 처리
+                color_info = raw_part_num.replace(part_num, "").strip(" ,")
+            else:
+                part_num = ""
+                color_info = raw_part_num
+
+            # 색상 정보 → 설명으로 이동
+            if color_info and color_info not in ("-", "0"):
+                if description:
+                    description = f"{description} (색상: {color_info})"
+                else:
+                    description = f"색상: {color_info}"
+
+            # 수량 정보 → 설명으로 이동
+            if quantity_info and quantity_info not in ("-", "0"):
+                if description:
+                    description = f"{description} (수량: {quantity_info})"
+                else:
+                    description = f"수량: {quantity_info}"
+
+            # ----------------------------------------------
+            # 3) Rebrickable에서 부품 정보 조회
+            # ----------------------------------------------
+            hint_text_parts = [part_type, description]
+            hint_text = " ".join([t for t in hint_text_parts if t]).strip()
+
+            part_data = client.resolve_part(part_num, hint_text)
+
+            if part_data:
+                part_name = (part_data.get("name") or "").strip()
+                img_url = (part_data.get("part_img_url") or "").strip()
+                resolved_part_num = (part_data.get("part_num") or "").strip()
+            else:
+                part_name = ""
+                img_url = ""
+                resolved_part_num = ""
+
+            # ----------------------------------------------
+            # 4) 최종 표에 보여줄 부품 번호 결정
+            #    => 항상 "번호"만 들어가도록 강제
+            # ----------------------------------------------
+            if resolved_part_num:
+                display_part_num = resolved_part_num
+            elif part_num:
+                display_part_num = part_num
+            else:
+                display_part_num = "-"
+
+            # 이미지 셀 HTML
+            if img_url:
+                img_html = (
+                    f"<img src='{img_url}' alt='part image' "
+                    f"style='max-width:80px; height:auto;' />"
+                )
+            else:
+                img_html = "-"
+
+            html_rows.append(
+                f"""
+                <tr>
+                  <td style="padding: 8px; text-align:left;">{part_type}</td>
+                  <td style="padding: 8px; text-align:center; white-space:nowrap;">{display_part_num}</td>
+                  <td style="padding: 8px; text-align:left;">{part_name or "-"}</td>
+                  <td style="padding: 8px; text-align:center;">{img_html}</td>
+                  <td style="padding: 8px; text-align:left;">{description}</td>
+                </tr>
+                """
+            )
+
+    table_html = f"""
+    <div style="width: 100%; overflow-x: auto;">
+      <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;" border="1">
+        <thead>
+          <tr style="background-color:#f5f5f5;">
+            <th style="padding: 8px;">부품 종류</th>
+            <th style="padding: 8px;">부품 번호</th>
+            <th style="padding: 8px;">부품 이름</th>
+            <th style="padding: 8px;">이미지</th>
+            <th style="padding: 8px;">설명 및 용도</th>
+          </tr>
+        </thead>
+        <tbody>
+          {''.join(html_rows)}
+        </tbody>
+      </table>
+    </div>
+    """
+    return table_html

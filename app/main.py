@@ -91,6 +91,22 @@ def build_user_input(goal: str, sidebar_state: Dict[str, Any]) -> str:
 
 
 # ------------------------------------------------------------
+# 공통 텍스트 정리 유틸 (보이는 '\n' 라인 제거)
+# ------------------------------------------------------------
+def _clean_visual_newline_lines(text: str) -> str:
+    """
+    답변 안에 '문자 그대로' '\\n' 이 한 줄로 들어간 경우,
+    그 줄은 화면에 그대로 보이므로 제거해준다.
+    (실제 줄바꿈 문자 '\n' 은 그대로 둔다)
+    """
+    if not text:
+        return text
+    lines = text.splitlines()
+    filtered = [ln for ln in lines if ln.strip() != r"\n"]
+    return "\n".join(filtered)
+
+
+# ------------------------------------------------------------
 # 5. 브릭/부품 제안 섹션 파싱 유틸
 # ------------------------------------------------------------
 def split_brick_section(answer: str) -> Tuple[str, str, str]:
@@ -255,38 +271,63 @@ def parse_brick_rows_from_section(brick_section: str) -> List[Dict[str, Any]]:
 def render_answer_with_brick_table(answer: str) -> None:
     """최종 답변을 렌더링하되,
     5. 브릭/부품 제안 부분은 Rebrickable API와 HTML 테이블로 재구성해서 보여준다.
+    또한, 테이블 위/아래에 보이는 '\\n' 라인은 제거하고,
+    5번 제목이 항상 보이도록 정리한다.
     """
+    # 전체 답변을 5번 섹션 기준으로 분리
     before, brick_section, after = split_brick_section(answer)
 
+    # 5번 섹션 자체가 없으면, 전체를 한 번 깨끗이 정리해서 바로 출력
     if not brick_section:
-        st.markdown(answer)
+        st.markdown(_clean_visual_newline_lines(answer))
         return
 
-    brick_rows = parse_brick_rows_from_section(brick_section)
+    # 5번 섹션 안에서, 눈에 보이는 '\n' 라인은 제거하고
+    # 의미 있는 라인만 남김
+    raw_section_lines = brick_section.splitlines()
+    section_lines = [
+        ln for ln in raw_section_lines if ln.strip() and ln.strip() != r"\n"
+    ]
 
-    section_lines = brick_section.splitlines()
-    header_line = section_lines[0] if section_lines else "5. 브릭/부품 제안"
+    if not section_lines:
+        logger.warning(
+            "[main] 브릭/부품 제안 섹션이 비어 있음 → 전체 답변만 출력."
+        )
+        st.markdown(_clean_visual_newline_lines(answer))
+        return
+
+    # 첫 줄은 항상 '5. 브릭/부품 제안' 헤더가 되도록 보정
+    header_line = section_lines[0]
+    cleaned_brick_section = "\n".join(section_lines)
+
+    # 테이블 파싱은 정리된 섹션 텍스트 기준으로 수행
+    brick_rows = parse_brick_rows_from_section(cleaned_brick_section)
 
     if not brick_rows:
         logger.warning(
             "[main] 브릭/부품 제안 섹션 파싱 실패 → 원본 섹션 그대로 표시."
         )
-        st.markdown(answer)
+        st.markdown(_clean_visual_newline_lines(answer))
         return
+
+    # before/after 텍스트에서도 눈에 보이는 '\n' 라인은 제거
+    before_clean = _clean_visual_newline_lines(before)
+    after_clean = _clean_visual_newline_lines(after)
 
     client = RebrickableClient()
     brick_table_html = build_brick_table_html(brick_rows, client)
 
-    if before.strip():
-        st.markdown(before)
+    if before_clean.strip():
+        st.markdown(before_clean)
 
+    # 👉 여기서 5번 제목이 항상 보이도록 출력
     st.markdown(header_line)
 
     # HTML 표를 그대로 렌더링 (순서 고정: 부품 종류 / 부품 번호 / 부품 이름 / 이미지 / 설명 및 용도)
     components.html(brick_table_html, height=400, scrolling=True)
 
-    if after.strip():
-        st.markdown(after)
+    if after_clean.strip():
+        st.markdown(after_clean)
 
 
 # ------------------------------------------------------------
