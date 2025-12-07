@@ -91,7 +91,6 @@ flowchart TD
     A1 --> RAG
     A2 --> RAG
     A3 --> RAG
-
 ```
 
 - 사용자가 사이드바 + 자유 텍스트로 아이디어를 입력합니다.
@@ -105,6 +104,7 @@ flowchart TD
 ## 📌 3. 서비스 아키텍처
 
 ```mermaid
+flowchart TB
 %%{init: {
   "theme": "neutral",
   "flowchart": { "nodeSpacing": 20, "rankSpacing": 25 },
@@ -116,7 +116,7 @@ flowchart TD
     "fontSize": "12px"
   }
 }}%%
-flowchart TB
+
 
     U([사용자 브라우저]):::client
     UI([Streamlit 앱<br/>app/main.py<br/>+ components/*]):::ui
@@ -153,7 +153,6 @@ flowchart TB
     classDef service fill:#ffebee,stroke:#e53935;
     classDef store fill:#fff8e1,stroke:#f9a825;
     classDef knowledge fill:#e0f7fa,stroke:#00838f;
-
 ```
 
 - **프론트엔드**: Streamlit UI + HTML 브릭 표(components/brick_table.py)
