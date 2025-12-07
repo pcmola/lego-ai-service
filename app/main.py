@@ -14,6 +14,16 @@ from workflow.state import LegoState
 
 from utils.rebrickable_client import RebrickableClient
 from components.brick_table import build_brick_table_html
+from datetime import datetime, timedelta, timezone
+
+KST = timezone(timedelta(hours=9))
+
+class KSTFormatter(logging.Formatter):
+    def formatTime(self, record, datefmt=None):
+        dt = datetime.fromtimestamp(record.created, KST)
+        if datefmt:
+            return dt.strftime(datefmt)
+        return dt.isoformat(timespec="seconds")
 
 
 def setup_logging() -> None:
@@ -26,7 +36,7 @@ def setup_logging() -> None:
 
     root_logger.setLevel(logging.INFO)
 
-    formatter = logging.Formatter(
+    formatter = KSTFormatter(
         "%(asctime)s [%(levelname)s] %(name)s - %(message)s"
     )
 
