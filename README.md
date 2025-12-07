@@ -12,10 +12,13 @@
 
 ## ⭐ 주요 특징
 
-- **Multi-Agent + LangGraph** 기반 워크플로우
-- **RAG 기반 지식검색**(레고 관련 기초 문서)
-- **Streamlit UI**로 간단한 브라우저 실행
-- **Azure OpenAI GPT-4o / GPT-4o-mini** 활용
+- **Multi-Agent + LangGraph** 워크플로우
+- **RAG 기반 지식 검색** (레고 기초 문서)
+- **Rebrickable API**로 브릭/부품 이미지 자동 조회
+- **Streamlit** 기반 웹 UI (로컬 브라우저 실행)
+- **Azure OpenAI (Foundry)**
+  - Chat: `gpt-4.1-mini`, `gpt-4.1`
+  - Embedding: `text-embedding-3-*`
 
 ---
 
@@ -37,14 +40,23 @@
 
 ## 📌 1. 기능 개요
 
-다음 단계로 구성됩니다:
+에이전트들은 아래 단계로 협업합니다.
 
-1. 사용자 입력
-2. 요구사항 분석(Requirements Agent)
-3. 설계 제안(Design Agent)
-4. RAG 기반 지식 강화
-5. 최종 결과 정리(Refiner Agent)
-6. Streamlit UI 출력
+1. **사용자 입력**
+   - 작품명, 용도(전시/놀이), 목표 크기, 난이도, 추가 제약 조건 등
+2. **요구사항 분석 (RequirementsAgent)**
+   - 입력을 구조화(요구/제약/우선순위 등)
+3. **설계 제안 (DesignAgent)**
+   - 구조, 모듈 분리, 색상/브릭 종류, 안정성 고려사항 등 제안
+4. **RAG 기반 지식 보강**
+   - 준비된 레고 지식 문서를 검색해 설계를 보완
+5. **최종 결과 정리 (RefinerAgent)**
+   - 사람이 읽기 좋은 가이드/체크리스트/빌드 팁 등으로 정리
+6. **브릭/부품 제안 표 생성**
+   - Refiner 결과 중 “브릭/부품 제안” 섹션을 파싱
+   - Rebrickable API로 각 부품의 이름·이미지를 조회 후 HTML 표로 렌더링
+7. **Streamlit UI 출력**
+   - 최종 텍스트 + 브릭/부품 표를 한 화면에 표시
 
 ---
 
@@ -156,7 +168,7 @@ flowchart TB
 ```text
 lego-ai-service/
 ├─ app/
-│  ├─ main.py                      # Streamlit 엔트리 + 브릭 표 파싱/렌더링
+│  ├─ main.py                     # Streamlit 엔트리 + 브릭 표 파싱/렌더링
 │  ├─ components/
 │  │  ├─ sidebar.py               # 사이드바 UI 구성
 │  │  └─ brick_table.py           # 브릭/부품 HTML 테이블 생성
@@ -190,49 +202,17 @@ lego-ai-service/
 
 ## 📌 5. 주요 모듈 설명
 
-### `app/main.py`
-
-Streamlit 메인 실행 파일.  
-사용자 입력을 받아 LangGraph 워크플로우를 실행하고,  
-결과 중 “5. 브릭/부품 제안” 섹션을 파싱하여 HTML 표로 렌더링합니다.
-
-### `app/components/sidebar.py`
-
-규모/용도/난이도/보유 부품 등 사용자 입력을 받는 사이드바 UI 구성.
-
-### `app/components/brick_table.py`
-
-브릭/부품 제안 리스트를 HTML 테이블로 생성.  
-Rebrickable API로 부품명·이미지 보완, 중복 제거, 불명확한 번호는 검색으로 자동 보정.
-
-### `app/workflow/graph.py`
-
-Requirements → Design → Refiner 에이전트를 순차 실행하는 LangGraph 정의.
-
-### `app/workflow/state.py`
-
-에이전트 간 공유되는 상태(LegoState)와 역할(AgentRole) 정의.
-
-### `app/workflow/agents/*`
-
-- `requirements_agent.py`: 요구사항 분석
-- `design_agent.py`: 구조·부품 설계 제안
-- `refiner_agent.py`: 최종 문서 정리
-- `base_agent.py`: 공통 LLM 호출/프롬프트 처리 로직
-
-### `app/retrieval/vector_store.py`
-
-레고 지식 문서를 임베딩하여 Chroma DB에 저장하고  
-에이전트가 RAG 검색을 수행할 수 있도록 지원.
-
-### `app/utils/config.py`
-
-Azure OpenAI LLM·Embedding 설정 및 모델 선택 로직.
-
-### `app/utils/rebrickable_client.py`
-
-Rebrickable API 클라이언트.  
-부품 조회(번호·검색), 대체 번호 매핑, 캐싱, 호출 제한 관리.
+| 모듈 경로                     | 역할 요약                                                  |
+| ----------------------------- | ---------------------------------------------------------- |
+| `app/main.py`                 | Streamlit 메인 실행, LangGraph 호출, 결과 & 브릭 표 렌더링 |
+| `components/sidebar.py`       | 사용자 입력 UI, 입력값을 LegoState로 변환                  |
+| `components/brick_table.py`   | 브릭 제안 파싱, Rebrickable API 조회, HTML 표 생성         |
+| `utils/rebrickable_client.py` | Rebrickable API 호출(부품 번호/이름/이미지 조회)           |
+| `workflow/state.py`           | LangGraph 상태(LegoState) 정의                             |
+| `workflow/graph.py`           | Multi-Agent 실행 플로우 구성 (Req → Design → Refiner)      |
+| `workflow/agents/*`           | 세부 에이전트 구현 (요구/설계/정리)                        |
+| `retrieval/vector_store.py`   | Chroma 기반 RAG 검색 엔진 구성                             |
+| `utils/config.py`             | Azure OpenAI 설정 로드, LLM/Embeddings 선택 함수 제공      |
 
 ## 📌 6. 환경변수 설정 (.env 예시)
 
@@ -264,6 +244,13 @@ REBRICKABLE_API_BASE=https://rebrickable.com/api/v3
 ---
 
 ## 📌 7. 실행 방법
+
+사전 요구사항
+
+- Python 3.10+ (권장: 3.11)
+- Docker & Docker Compose (선택 사항, Docker 기반 실행 시)
+- Azure OpenAI (Foundry) 리소스
+- Rebrickable API Key (브릭 이미지/이름 조회 시 활용)
 
 ### 1) 로컬(가상환경) 실행
 
@@ -318,10 +305,6 @@ docker-compose up --build
     - `./app:/app/app`
     - `./retrieval:/app/retrieval`
 
-    ```
-
-    ```
-
   - 커맨드: `streamlit run app/main.py --server.port=8501 --server.address=0.0.0.0`
 
 ---
@@ -365,12 +348,12 @@ python test_azure_openai.py
 
 ## 📌 9. TODO (향후 개선 예정)
 
+- [ ] 브릭/부품 제안 파싱 정확도 개선
+- [ ] Rebrickable API 캐싱 및 대체 파트 처리 강화
+- [ ] 브릭 표 기능 고도화 (색상/수량 인식)
 - [ ] RAG 지식 문서 확장
-- [ ] LEGO 브릭(Parts) 리스트 자동 생성 기능
-- [ ] 결과물 Markdown / PDF Export 기능
-- [ ] 다중 설계안(옵션 A/B/C) 생성 기능
-- [ ] 이미지 기반 설계 보조 기능 (예: 사진 입력 → 구조 분석)
-- [ ] Streamlit UI 고도화 (단계별 화면, 히스토리 관리 등)
+- [ ] Streamlit UI 개선 (히스토리, Export 기능)
+- [ ] 에이전트/파트 파싱 테스트 코드 보강
 
 ## 📌 10. 문의
 
