@@ -158,23 +158,17 @@ def parse_brick_rows_from_section(brick_section: str) -> List[Dict[str, Any]]:
     """
     브릭/부품 제안 섹션 텍스트에서 행(row) 리스트 추출.
 
-    지원 포맷 예시:
+    새 표 형식 (우선 지원):
+      | 부품 종류 | 부품 번호 | 부품 이름 | 이미지 | 설명 및 용도 |
 
-    A) 4열 - 용도 / 부품 종류 및 색상 / 부품 번호 / 비고
-       → part_type = 2열, part_num = 3열, description = 4열
-
-    B) 3열 - 부품 종류 / 상세 예시 및 부품 번호 / 용도 및 특징
-       → part_type = 1열, part_num = '상세 예시' 안 숫자, description = 3열
-
-    어떤 포맷이든 최종적으로는
-      part_type / part_num / description
-    세 필드만 뽑아서 brick_table 로 넘긴다.
+    - 에이전트가 위 형식을 지키면 이 규칙으로 파싱
+    - 그렇지 않은 경우에는 기존(레거시) 3~4열 포맷으로 최대한 해석
     """
     lines = brick_section.splitlines()
     if not lines:
         return []
 
-    # 첫 줄은 '5. 브릭/부품 제안' 헤더일 가능성이 크니 건너뜀
+    # 첫 줄은 보통 "5. 브릭/부품 제안" 헤더 → 내용에서 제외
     content_lines = [ln for ln in lines[1:] if ln.strip()]
     if not content_lines:
         return []
@@ -185,9 +179,9 @@ def parse_brick_rows_from_section(brick_section: str) -> List[Dict[str, Any]]:
         stripped = line.strip()
         if "|" not in stripped:
             continue
+        # 구분선(| --- | --- |)은 제외
         sep_candidate = stripped.replace("|", "").strip()
         if sep_candidate and set(sep_candidate) <= set("-: "):
-            # --- 같은 구분선은 스킵
             continue
         header_idx = idx
         break
@@ -199,35 +193,108 @@ def parse_brick_rows_from_section(brick_section: str) -> List[Dict[str, Any]]:
     header_line = content_lines[header_idx].strip()
     header_cells = [c.strip() for c in header_line.strip("|").split("|")]
     n_cols = len(header_cells)
-    logger.info("[main] 브릭/부품 제안 테이블 헤더: %s", header_cells)
-
-    # --- 포맷 판별 ---
     header_text = " ".join(header_cells)
+
+    logger.info("[main] 브릭/부품 헤더: %s", header_cells)
+
+    # --- 새 표 형식인지 먼저 판별 ---
+    is_new_standard = (
+        any("부품 종류" in c for c in header_cells)
+        and any("부품 번호" in c for c in header_cells)
+        and any("부품 이름" in c for c in header_cells)
+        and any("이미지" in c for c in header_cells)
+        and ("설명" in header_text or "용도" in header_text)
+    )
+
+    rows: List[Dict[str, Any]] = []
+
+    if is_new_standard:
+        # ✅ 새 표 포맷: 부품 종류 / 부품 번호 / 부품 이름 / 이미지 / 설명 및 용도
+        logger.info("[main] 새 표 형식(5열)으로 브릭 제안 파싱")
+
+        # 각 컬럼 인덱스 찾기 (혹시 순서가 바뀌어도 이름으로 찾도록)
+        def find_idx(keyword: str, default: int) -> int:
+            for i, c in enumerate(header_cells):
+                if keyword in c:
+                    return i
+            return default
+
+        idx_type = find_idx("부품 종류", 0)
+        idx_num = find_idx("부품 번호", 1 if n_cols > 1 else 0)
+        idx_desc = find_idx("설명", n_cols - 1)
+
+        for line in content_lines[header_idx + 1 :]:
+            stripped = line.strip()
+            if not stripped or "|" not in stripped:
+                continue
+
+            # 구분선 스킵
+            sep_candidate = stripped.replace("|", "").strip()
+            if sep_candidate and set(sep_candidate) <= set("-: "):
+                continue
+
+            cells = [c.strip() for c in stripped.strip("|").split("|")]
+            if len(cells) < 3:  # 최소 3개는 있어야 의미 있음
+                continue
+
+            # 인덱스 범위 방어
+            def safe_get(c_list, idx):
+                return c_list[idx] if 0 <= idx < len(c_list) else ""
+
+            part_type = safe_get(cells, idx_type)
+            part_num = safe_get(cells, idx_num)
+            description = safe_get(cells, idx_desc)
+
+            # URL이 설명에 들어온 경우는 후처리에서 제거하므로 여기서는 그대로 둠
+            rows.append(
+                {
+                    "part_type": part_type,
+                    "part_num": part_num,
+                    "description": description,
+                }
+            )
+
+        logger.info("[main] 새 표 형식으로 파싱된 행 수: %d", len(rows))
+        return rows
+
+    # ------------------------------------------------------------
+    # 이하: 레거시 3~4열 포맷 (예전 규칙) → 기존 코드 최대한 유지
+    # ------------------------------------------------------------
+    logger.info("[main] 레거시 표 형식으로 브릭 제안 파싱 시도")
+
+    # 첫 줄은 '5. 브릭/부품 제안' 헤더일 가능성이 크니 건너뜀
+    # 이미 content_lines 는 1줄 건너뛴 상태
+    # header_idx 이후가 실제 데이터
+    content_lines_after_header = content_lines
+    header_line = content_lines_after_header[header_idx].strip()
+    header_cells = [c.strip() for c in header_line.strip("|").split("|")]
+    n_cols = len(header_cells)
+    header_text = " ".join(header_cells)
+
+    # --- 포맷 판별 (기존 로직) ---
     format_type = "type_first_detail_3"
 
     if n_cols >= 4 and "용도" in header_cells[0] and "부품 번호" in header_text:
-        # 용도 / 부품 종류 및 색상 / 부품 번호 / 비고
         format_type = "usage_first_4"
     elif n_cols == 3 and (
         "상세 예시" in header_cells[1]
         or "상세 설명" in header_cells[1]
         or "상세 예시 및 부품 번호" in header_cells[1]
     ):
-        # 부품 종류 / 상세 예시 및 부품 번호 / 용도 및 특징
         format_type = "type_first_detail_3"
     else:
-        # 애매하면 3열 상세 포맷으로 처리 (안전하게 숫자 추출)
         if n_cols >= 3 and "상세" in header_cells[1]:
             format_type = "type_first_detail_3"
         elif n_cols >= 4:
             format_type = "usage_first_4"
 
-    logger.info("[main] 브릭/부품 제안 테이블 포맷 판별: %s", format_type)
+    logger.info("[main] 브릭/부품 제안 레거시 포맷 판별: %s", format_type)
 
-    # --- 데이터 행 파싱 ---
-    rows: List[Dict[str, Any]] = []
+    def _extract_first_part_num(text: str) -> str:
+        m = re.search(r"\b(\d{3,6}[a-zA-Z]?)\b", text)
+        return m.group(1) if m else ""
 
-    for line in content_lines[header_idx + 1 :]:
+    for line in content_lines_after_header[header_idx + 1 :]:
         stripped = line.strip()
         if not stripped or "|" not in stripped:
             continue
@@ -238,18 +305,14 @@ def parse_brick_rows_from_section(brick_section: str) -> List[Dict[str, Any]]:
         cells = [c.strip() for c in stripped.strip("|").split("|")]
 
         if format_type == "usage_first_4":
-            # 기대: [용도, 부품 종류 및 색상, 부품 번호, 비고]
             if len(cells) < 4:
-                logger.debug("[main] usage_first_4 포맷이지만 4셀 미만: %s", cells)
                 continue
             usage = cells[0]
             part_type = cells[1]
             part_num = cells[2]
             description = cells[3] or usage
         else:  # type_first_detail_3
-            # 기대: [부품 종류, 상세 예시 및 부품 번호, 용도 및 특징]
             if len(cells) < 3:
-                logger.debug("[main] type_first_detail_3 포맷이지만 3셀 미만: %s", cells)
                 continue
             part_type = cells[0]
             detail = cells[1]
@@ -264,7 +327,7 @@ def parse_brick_rows_from_section(brick_section: str) -> List[Dict[str, Any]]:
             }
         )
 
-    logger.info("[main] 브릭/부품 제안 섹션 파싱된 행 수: %d", len(rows))
+    logger.info("[main] 레거시 포맷으로 파싱된 행 수: %d", len(rows))
     return rows
 
 
