@@ -357,21 +357,77 @@ python test_azure_openai.py
 
 ## 📌 10. 문의
 
-프로젝트 관련 문의 또는 협업 제안은 아래 연락처를 통해 가능합니다.
+### 🙋‍♂️ 문의 / 협업 제안
 
-- **Author:** 메이커 꾸러기 (Jongyoon Won)
-- **GitHub:** https://github.com/pcmola
-- **Blog:** http://pcmola.com
-- **Email:** pcmola@naver.com
+이 프로젝트와 관련된 이슈, 버그 리포트, 기능 제안 등은 아래 채널을 활용해주세요.
+
+- GitHub 이슈: https://github.com/pcmola/lego-ai-service/issues
+- Maintainer: **Jongyoon Won (메이커 꾸러기)**
+- GitHub: https://github.com/pcmola
+- Blog: http://pcmola.com
+- Email: pcmola@naver.com
+
+Pull Request / 코드 리뷰 / 아이디어 제안 모두 환영합니다. 🙂
+
+---
+
+### 🧱 LEGO 상표 관련 안내
+
+- LEGO® 및 레고 로고는 The LEGO Group의 상표입니다.
+- 본 프로젝트는 The LEGO Group과 공식적인 제휴·후원·승인을 받은 프로젝트가 아니며,  
+  비상업적·팬 메이드(팬 프로젝트)로 운영됩니다.
 
 ## 📌 11. 결과 예시
 
-### 🔹레고 창작 Agent 결과 화면
+<details>
+<summary><strong>📂 클릭하여 결과 예시 펼치기 / 접기</strong></summary>
+<br>
+
+아래는 레고 창작 AI Agent가 실제로 생성하는 화면 예시입니다.  
+사용자 입력 → 에이전트 협업 → 브릭/부품 표 생성까지의 전체 흐름을 확인할 수 있습니다.
+
+---
+
+### 1) 초기 생성 결과 화면
+
+사용자가 아이디어(컨셉·크기·용도 등)를 입력하면,  
+Multi-Agent Workflow가 자동으로 요구사항을 분석하고 설계를 시작합니다.
+
+<img src="./images/01.InitResult.png" width="1007">
+
+---
+
+### 2) AI 설계 결과 (최종 요약 + 구조 가이드)
+
+아래는 RefinerAgent가 생성한 최종 문서 예시입니다.
+
+- 전체 설계 요약
+- 구조적 고려사항
+- 전시 안정성 팁
+- 색상·모듈 구성 가이드 등이 포함됩니다.
 
 <img src="./images/03.AI-Result2.png" width="1232">
 
-**[그림 2] AI가 생성한 최종 레고 설계 결과 화면**
+---
+
+### 3) 브릭/부품 제안 표 (Rebrickable API 연동)
+
+AI가 생성한 “브릭/부품 제안 섹션”을 파싱하여  
+각 부품 번호·이미지·공식 이름을 Rebrickable API에서 자동으로 조회합니다.
+
+아래는 실제 Streamlit 화면에 표시되는 HTML 테이블 예시입니다.
 
 <img src="./images/04.AI-Result3.png" width="1232">
 
-**[그림 3] 리브리커블과 연동하여 레고 부품 정보 표시**
+- 부품 번호 → Rebrickable API로 검색
+- 공식 영문 이름, 이미지 자동 삽입
+- 설명/용도는 AI가 해석하여 자연어로 정리
+- 스크롤 가능한 표 형태로 UI에 표시됨
+
+---
+
+이와 같은 방식으로  
+**사용자 아이디어 → 구조 설계 → 브릭 제안 → 시각화**  
+까지 전체 파이프라인이 자동 실행됩니다.
+
+</details>
