@@ -63,9 +63,13 @@ def build_brick_table_html(
     - 부품 번호는 3~6자리(+선택 알파벳) 토큰만 허용
     - 부품 종류에 숫자만 들어온 경우 → 번호로 인식하고 종류는 비움
     - 설명 안에 들어온 URL 은 모두 제거
+
+    - 같은 부품(번호 + 이름 + 이미지 URL)이면 설명이 조금 달라도 한 줄만 남깁니다.
     """
 
     html_rows: List[str] = []
+    # ✅ 중복 제거: (번호, 이름, 이미지) 가 같으면 하나만 출력
+    seen_rows = set()
 
     for row in rows:
         type_raw = (row.get("part_type") or "").strip()
@@ -101,7 +105,6 @@ def build_brick_table_html(
                 display_num = m.group(1)
 
         # 5) 부품 종류 셀
-        #    - 타입 텍스트가 없고, Rebrickable 이름이 있으면 종류 대신 이름의 짧은 버전 사용
         display_type = type_text
         if not display_type and part_name:
             display_type = part_name
@@ -114,6 +117,17 @@ def build_brick_table_html(
             )
         else:
             img_html = "-"
+
+        # ✅ 7) 중복 행 체크
+        #    번호 + 이름 + 이미지URL 가 동일하면 같은 부품으로 보고 스킵
+        dedupe_key = (
+            display_num,
+            part_name or "-",
+            img_url or "",
+        )
+        if dedupe_key in seen_rows:
+            continue
+        seen_rows.add(dedupe_key)
 
         html_rows.append(
             f"""
