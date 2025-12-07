@@ -14,10 +14,10 @@ class RebrickableClient:
 
     - 기본 사용:
         client = RebrickableClient()
-        part = client.resolve_part("3001", "Brick 2 x 4 red")
     """
 
     BASE_URL = "https://rebrickable.com/api/v3/lego"
+
     # 너무 과한 호출 방지를 위한 최소 간격(초) – 1초 권장
     MIN_INTERVAL = 1.0
 
@@ -50,10 +50,10 @@ class RebrickableClient:
             time.sleep(self.MIN_INTERVAL - elapsed)
         self._last_call_ts = time.time()
 
-    def _get(self, url: str, *, params: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
-        """공통 GET 요청 래퍼."""
+    def _get(self, url: str, params: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
+        """공통 GET 호출 래퍼."""
         if not self.api_key:
-            logger.debug("[RebrickableClient] API 키 없음, 호출 스킵: %s", url)
+            logger.warning("[RebrickableClient] API Key 미설정 상태에서 _get 호출: %s", url)
             return None
 
         self._throttle()
@@ -62,7 +62,7 @@ class RebrickableClient:
             resp = self.session.get(
                 url,
                 headers=self._headers(),
-                params=params,
+                params=params or {},
                 timeout=10,
             )
         except Exception as e:
@@ -118,8 +118,7 @@ class RebrickableClient:
         if not query or query in ("-",):
             return None
 
-        # 캐시는 'SEARCH::쿼리' 형식의 키 사용
-        cache_key = f"SEARCH::{query}"
+        cache_key = f"search::{query}"
         if cache_key in self._part_cache:
             return self._part_cache[cache_key]
 
@@ -148,14 +147,16 @@ class RebrickableClient:
         """
         파트 번호와 힌트 텍스트를 함께 사용해 파트를 찾는다.
 
-        1순위: part_num 으로 정확 조회
-        2순위: hint_text (부품 이름/용도/사이즈 등) 으로 검색
-        둘 다 실패하면 None 반환.
+        1순위: part_num 으로 정확 조회 (/parts/{part_num}/)
+        2순위: part_num 을 검색어로 사용해 검색 (/parts/?search=part_num)
+              → BrickLink 번호 등 외부 ID인 경우 Rebrickable이 매핑해줄 수 있음
+        3순위: hint_text (부품 이름/용도/사이즈 등) 으로 검색
+        모두 실패하면 None 반환.
         """
         part_num = (part_num or "").strip()
         hint_text = (hint_text or "").strip()
 
-        # 1) 번호 우선
+        # 1) 번호 우선 (정확 조회)
         if part_num and part_num not in ("-", "0"):
             data = self.get_part_by_num(part_num)
             if data:
@@ -166,7 +167,19 @@ class RebrickableClient:
                 )
                 return data
 
-        # 2) 번호가 없거나 실패 → 텍스트 검색
+        # 2) 번호가 Rebrickable 기본 ID가 아니더라도,
+        #    search=part_num 로 한번 더 시도 (BrickLink 번호 등 매핑용)
+        if part_num and part_num not in ("-", "0"):
+            data = self.search_part_by_text(part_num)
+            if data:
+                logger.debug(
+                    "[RebrickableClient] part_num 텍스트 검색으로 파트 식별 성공: %s -> %s",
+                    part_num,
+                    data.get("part_num"),
+                )
+                return data
+
+        # 3) 번호가 없거나 실패 → 힌트 텍스트 검색
         if hint_text:
             data = self.search_part_by_text(hint_text)
             if data:
