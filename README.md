@@ -126,10 +126,10 @@ flowchart TB
     "rankSpacing": 40
   },
   "themeVariables": {
-    "primaryColor": "#e3f2fd",
-    "primaryTextColor": "#111111",
-    "lineColor": "#555555",
-    "tertiaryColor": "#ffffff",
+    "primaryColor": "#F5F7FB",
+    "primaryTextColor": "#1F2933",
+    "lineColor": "#B0BEC5",
+    "tertiaryColor": "#FFFFFF",
     "fontSize": "14px"
   }
 }}%%
@@ -197,13 +197,13 @@ flowchart TB
     UI --> LOG
 
     %% ───────── 스타일 정의 ─────────
-    classDef client fill:#ffffff,stroke:#777;
-    classDef ui fill:#e3f2fd,stroke:#1e88e5;
-    classDef orchestrator fill:#ede7f6,stroke:#8e24aa;
-    classDef agent fill:#e8f5e9,stroke:#43a047;
-    classDef service fill:#ffebee,stroke:#e53935;
-    classDef store fill:#fff8e1,stroke:#f9a825;
-    classDef knowledge fill:#e0f7fa,stroke:#00838f;
+    classDef client fill:#FFFFFF,stroke:#B0BEC5,color:#374151;
+    classDef ui fill:#E3F2FD,stroke:#1D4ED8,color:#1E3A8A;
+    classDef orchestrator fill:#F3E8FF,stroke:#8B5CF6,color:#4C1D95;
+    classDef agent fill:#ECFDF3,stroke:#22C55E,color:#166534;
+    classDef service fill:#FEF2F2,stroke:#F97373,color:#B91C1C;
+    classDef store fill:#FFFBEB,stroke:#F59E0B,color:#92400E;
+    classDef knowledge fill:#E0F2FE,stroke:#0EA5E9,color:#075985;
 
 ```
 
