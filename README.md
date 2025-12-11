@@ -61,7 +61,23 @@
 ## 📌 2. 사용자 흐름 (User Flow)
 
 ```mermaid
-flowchart TD
+%%{init: {
+  "theme": "neutral",
+  "background": "white",
+  "flowchart": {
+    "nodeSpacing": 10,
+    "rankSpacing": 40
+  },
+  "themeVariables": {
+    "primaryColor": "#e3f2fd",
+    "primaryTextColor": "#111111",
+    "lineColor": "#555555",
+    "tertiaryColor": "#ffffff",
+    "fontSize": "14px"
+  }
+}}%%
+flowchart TB
+
     %% ===================== 스타일 정의 =====================
     classDef input fill:#E3F2FD,stroke:#1E88E5,stroke-width:1px,color:#0D47A1;
     classDef agent fill:#FFE0B2,stroke:#FB8C00,stroke-width:1px,color:#E65100;
@@ -102,48 +118,85 @@ flowchart TD
 ## 📌 3. 서비스 아키텍처
 
 ```mermaid
-flowchart TB
 %%{init: {
   "theme": "neutral",
-  "flowchart": { "nodeSpacing": 20, "rankSpacing": 25 },
+  "background": "white",
+  "flowchart": {
+    "nodeSpacing": 10,
+    "rankSpacing": 40
+  },
   "themeVariables": {
     "primaryColor": "#e3f2fd",
     "primaryTextColor": "#111111",
     "lineColor": "#555555",
     "tertiaryColor": "#ffffff",
-    "fontSize": "12px"
+    "fontSize": "14px"
   }
 }}%%
+flowchart TB
 
-
+    %% ───────── 클라이언트 / UI ─────────
     U([사용자 브라우저]):::client
-    UI([Streamlit 앱<br/>app/main.py<br/>+ components/*]):::ui
+
+    subgraph UI_LAYER[ ]
+      direction TB
+      UI([Streamlit 앱<br/>app/main.py<br/>+ components/*]):::ui
+      BT([브릭/부품 HTML 표<br/>app/components/brick_table.py]):::ui
+    end
+
+    %% ───────── 오케스트레이터 & 에이전트 ─────────
     G([LangGraph App<br/>workflow/graph.py]):::orchestrator
 
-    R([RequirementsAgent]):::agent
-    D([DesignAgent]):::agent
-    F([RefinerAgent]):::agent
+    subgraph AGENTS[ ]
+      direction TB
+      R([RequirementsAgent]):::agent
+      D([DesignAgent]):::agent
+      F([RefinerAgent]):::agent
+    end
 
-    E([Azure OpenAI<br/>Embeddings]):::service
-    LLM([Azure OpenAI<br/>LLM<br/>gpt-4.1-mini · gpt-4.1]):::service
+    %% ───────── Azure OpenAI 서비스 ─────────
+    subgraph AZURE[ ]
+      direction TB
+      E([Azure OpenAI<br/>Embeddings]):::service
+      LLM([Azure OpenAI<br/>LLM<br/>gpt-4.1-mini · gpt-4.1]):::service
+    end
 
-    VS([Chroma VectorStore<br/>app/retrieval/vector_store.py]):::store
-    K["레고 지식 문서<br/>app/retrieval/knowledge/*.md"]:::knowledge
+    %% ───────── 지식 / 저장소 ─────────
+    subgraph STORAGE[ ]
+      direction TB
+      VS([Chroma VectorStore<br/>app/retrieval/vector_store.py]):::store
+      K["레고 지식 문서<br/>app/retrieval/knowledge/*.md"]:::knowledge
+      LOG([로그 파일<br/>app/logs/app.log]):::store
+    end
 
+    %% ───────── 외부 API ─────────
     RB([Rebrickable API<br/>app/utils/rebrickable_client.py]):::service
-    BT([브릭/부품 HTML 표<br/>app/components/brick_table.py]):::ui
-    LOG([로그 파일<br/>app/logs/app.log]):::store
 
-    U --> UI --> G
-    G --> R --> E
+    %% ───────── 연결 ─────────
+    U --> UI
+    UI --> G
+
+    G --> R
+    G --> D
+    G --> F
+
+    R --> E
+    D --> LLM
+    F --> LLM
+
     R --> VS
-    G --> D --> LLM
     D --> VS
-    G --> F --> LLM
+    F --> VS
+
     VS --> K
-    UI -- "최종 답변 중 5번 섹션 파싱" --> RB --> BT --> UI
+
+    UI -- "최종 답변 중<br/>5번 섹션 파싱" --> RB
+    RB --> BT
+    BT --> UI
+
     UI --> LOG
 
+    %% ───────── 스타일 정의 ─────────
     classDef client fill:#ffffff,stroke:#777;
     classDef ui fill:#e3f2fd,stroke:#1e88e5;
     classDef orchestrator fill:#ede7f6,stroke:#8e24aa;
@@ -151,6 +204,7 @@ flowchart TB
     classDef service fill:#ffebee,stroke:#e53935;
     classDef store fill:#fff8e1,stroke:#f9a825;
     classDef knowledge fill:#e0f7fa,stroke:#00838f;
+
 ```
 
 - **프론트엔드**: Streamlit UI + HTML 브릭 표(components/brick_table.py)
