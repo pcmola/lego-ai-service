@@ -117,6 +117,8 @@ flowchart TB
 
 ## 📌 3. 서비스 아키텍처
 
+### 3.1. 어른용
+
 ```mermaid
 %%{init: {
   "theme": "neutral",
@@ -214,6 +216,79 @@ flowchart TB
 - **워크플로우**: LangGraph 기반 Multi-Agent (workflow/graph.py)
 - **백엔드**: Azure OpenAI LLM/Embeddings, Chroma VectorStore, Rebrickable API 연동
 - **로깅**: 콘솔 + app/logs/app.log 파일 (UTC+9, 순환 로그)
+
+### 3.1. 어린이용
+
+```mermaid
+%%{init: {
+  "theme": "neutral",
+  "background": "white",
+  "flowchart": { "nodeSpacing": 20, "rankSpacing": 55 },
+  "themeVariables": {
+    "primaryColor": "#F0F9FF",
+    "primaryTextColor": "#1E293B",
+    "lineColor": "#94A3B8",
+    "tertiaryColor": "#FFFFFF",
+    "fontSize": "16px"
+  }
+}}%%
+flowchart TB
+
+  %% 👦 사용자
+  U(["👦 사용자"]):::user
+
+  %% 🖥️ 화면 (Streamlit 같은 기술명 제거)
+  UI(["🖥️ 레고 만드는 화면"]):::ui
+  BT(["🧱 부품 표(목록)"]):::ui
+
+  %% 🤖 로봇 친구들(에이전트)
+  subgraph AI["🤖 생각하는 로봇 친구들"]
+    direction TB
+    R(["1) 무엇을 만들까?"]):::agent
+    D(["2) 어떻게 만들까?"]):::agent
+    F(["3) 더 보기 좋게 정리하기"]):::agent
+  end
+
+  %% 📚 레고 책장(지식)
+  subgraph BOOKS["📚 레고 책장"]
+    direction TB
+    K(["레고 설명/규칙 모음"]):::book
+    VS(["찾기 도우미(검색 상자)"]):::book
+  end
+
+  %% 🛒 부품 정보 가져오기(외부)
+  SHOP(["🛒 부품 정보 가져오기"]):::shop
+
+  %% 🧾 기록(로그)
+  LOG(["🧾 작업 기록장"]):::log
+
+  %% 🔗 연결
+  U --> UI
+
+  UI --> R
+  R --> D
+  D --> F
+  F --> UI
+
+  R --> VS
+  D --> VS
+  F --> VS
+  VS --> K
+
+  UI -- "부품 이름/사진 찾기" --> SHOP
+  SHOP --> BT
+  BT --> UI
+
+  UI --> LOG
+
+  %% 🎨 스타일
+  classDef user fill:#FFF7ED,stroke:#FB923C,color:#7C2D12;
+  classDef ui fill:#E0F2FE,stroke:#0284C7,color:#0C4A6E;
+  classDef agent fill:#ECFDF5,stroke:#22C55E,color:#14532D;
+  classDef book fill:#EEF2FF,stroke:#6366F1,color:#312E81;
+  classDef shop fill:#FEF2F2,stroke:#EF4444,color:#7F1D1D;
+  classDef log fill:#F8FAFC,stroke:#94A3B8,stroke-width:1px,stroke-dasharray:4 4,color:#64748B;
+```
 
 ---
 
