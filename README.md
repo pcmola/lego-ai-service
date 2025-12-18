@@ -121,10 +121,7 @@ flowchart TB
 %%{init: {
   "theme": "neutral",
   "background": "white",
-  "flowchart": {
-    "nodeSpacing": 10,
-    "rankSpacing": 40
-  },
+  "flowchart": { "nodeSpacing": 10, "rankSpacing": 40 },
   "themeVariables": {
     "primaryColor": "#F5F7FB",
     "primaryTextColor": "#1F2933",
@@ -135,76 +132,82 @@ flowchart TB
 }}%%
 flowchart TB
 
-    %% ───────── 클라이언트 / UI ─────────
-    U([사용자 브라우저]):::client
+  %% ───────── 클라이언트 / UI ─────────
+  U([사용자 브라우저]):::client
 
-    subgraph UI_LAYER[ ]
-      direction TB
-      UI([Streamlit 앱<br/>app/main.py<br/>+ components/*]):::ui
-      BT([브릭/부품 HTML 표<br/>app/components/brick_table.py]):::ui
-    end
+  subgraph UI_LAYER[ ]
+    direction TB
+    UI([Streamlit 앱<br/>app/main.py<br/>+ components/*]):::ui
+    BT([브릭/부품 HTML 표<br/>app/components/brick_table.py]):::ui
+  end
 
-    %% ───────── 오케스트레이터 & 에이전트 ─────────
-    G([LangGraph App<br/>workflow/graph.py]):::orchestrator
+  %% ───────── 오케스트레이터 & 에이전트 ─────────
+  G([LangGraph App<br/>workflow/graph.py]):::orchestrator
 
-    subgraph AGENTS[ ]
-      direction TB
-      R([RequirementsAgent]):::agent
-      D([DesignAgent]):::agent
-      F([RefinerAgent]):::agent
-    end
+  subgraph AGENTS[ ]
+    direction TB
+    R([RequirementsAgent]):::agent
+    D([DesignAgent]):::agent
+    F([RefinerAgent]):::agent
+  end
 
-    %% ───────── Azure OpenAI 서비스 ─────────
-    subgraph AZURE[ ]
-      direction TB
-      E([Azure OpenAI<br/>Embeddings]):::service
-      LLM([Azure OpenAI<br/>LLM<br/>gpt-4.1-mini · gpt-4.1]):::service
-    end
+  %% ───────── Azure OpenAI 서비스 ─────────
+  subgraph AZURE[ ]
+    direction TB
+    E([Azure OpenAI<br/>Embeddings]):::service
+    LLM([Azure OpenAI<br/>LLM<br/>gpt-4.1-mini · gpt-4.1]):::service
+  end
 
-    %% ───────── 지식 / 저장소 ─────────
-    subgraph STORAGE[ ]
-      direction TB
-      VS([Chroma VectorStore<br/>app/retrieval/vector_store.py]):::store
-      K["레고 지식 문서<br/>app/retrieval/knowledge/*.md"]:::knowledge
-      LOG([로그 파일<br/>app/logs/app.log]):::store
-    end
+  %% ───────── 지식 / 저장소 ─────────
+  subgraph STORAGE[ ]
+    direction TB
+    VS([Chroma VectorStore<br/>app/retrieval/vector_store.py]):::store
+    K["레고 지식 문서<br/>app/retrieval/knowledge/*.md"]:::knowledge
+    LOG([로그 파일<br/>app/logs/app.log]):::ops
+  end
 
-    %% ───────── 외부 API ─────────
-    RB([Rebrickable API<br/>app/utils/rebrickable_client.py]):::service
+  %% ───────── 외부 API ─────────
+  RB([Rebrickable API<br/>app/utils/rebrickable_client.py]):::service
 
-    %% ───────── 연결 ─────────
-    U --> UI
-    UI --> G
+  %% ───────── 연결 ─────────
+  U --> UI
+  UI --> G
 
-    G --> R
-    G --> D
-    G --> F
+  G --> R
+  G --> D
+  G --> F
 
-    R --> E
-    D --> LLM
-    F --> LLM
+  R --> E
+  D --> LLM
+  F --> LLM
 
-    R --> VS
-    D --> VS
-    F --> VS
+  R --> VS
+  D --> VS
+  F --> VS
+  VS --> K
 
-    VS --> K
+  UI -- "최종 답변 중<br/>5번 섹션 파싱" --> RB
+  RB --> BT
+  BT --> UI
 
-    UI -- "최종 답변 중<br/>5번 섹션 파싱" --> RB
-    RB --> BT
-    BT --> UI
+  UI --> LOG
 
-    UI --> LOG
+  %% ───────── 스타일 정의 ─────────
+  classDef client fill:#FFFFFF,stroke:#B0BEC5,color:#374151;
+  classDef ui fill:#E3F2FD,stroke:#1D4ED8,color:#1E3A8A;
+  classDef orchestrator fill:#F3E8FF,stroke:#8B5CF6,color:#4C1D95;
+  classDef agent fill:#ECFDF3,stroke:#22C55E,color:#166534;
+  classDef service fill:#FEF2F2,stroke:#F97373,color:#B91C1C;
+  classDef store fill:#FFFBEB,stroke:#F59E0B,color:#92400E;
+  classDef knowledge fill:#E0F2FE,stroke:#0EA5E9,color:#075985;
 
-    %% ───────── 스타일 정의 ─────────
-    classDef client fill:#FFFFFF,stroke:#B0BEC5,color:#374151;
-    classDef ui fill:#E3F2FD,stroke:#1D4ED8,color:#1E3A8A;
-    classDef orchestrator fill:#F3E8FF,stroke:#8B5CF6,color:#4C1D95;
-    classDef agent fill:#ECFDF3,stroke:#22C55E,color:#166534;
-    classDef service fill:#FEF2F2,stroke:#F97373,color:#B91C1C;
-    classDef store fill:#FFFBEB,stroke:#F59E0B,color:#92400E;
-    classDef knowledge fill:#E0F2FE,stroke:#0EA5E9,color:#075985;
+  %% 운영/로그 요소(배경화): 점선 + 회색 + 연한 배경
+  classDef ops fill:#F8FAFC,stroke:#94A3B8,stroke-width:1px,stroke-dasharray:4 4,color:#64748B;
 
+  linkStyle 5,6,7 stroke:#E11D48,stroke-width:1.6px,stroke-dasharray:6 3;
+
+  %% LOG 연결선도 더 "배경" 느낌으로
+  linkStyle 15 stroke:#94A3B8,stroke-width:1px,stroke-dasharray:4 4;
 ```
 
 - **프론트엔드**: Streamlit UI + HTML 브릭 표(components/brick_table.py)
