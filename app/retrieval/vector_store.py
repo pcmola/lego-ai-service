@@ -1,5 +1,6 @@
 import os
 import glob
+from functools import lru_cache
 from typing import List, Dict, Any
 
 from langchain_chroma import Chroma
@@ -40,7 +41,9 @@ def _build_vectorstore():
     return vs
 
 
+@lru_cache(maxsize=1)
 def get_vectorstore():
+    """벡터스토어는 프로세스당 한 번만 열고 재사용 (검색마다 Chroma/임베딩 클라이언트 재생성 방지)"""
     has_db = os.path.exists(PERSIST_DIR) and os.listdir(PERSIST_DIR)
     if not has_db:
         return _build_vectorstore()
@@ -58,9 +61,7 @@ def get_retriever():
 
 
 def search_lego_info(query: str, k: int = 4) -> List[Document]:
-    retriever = get_retriever()
-    docs = retriever.invoke(query)
-    return docs[:k]
+    return get_vectorstore().similarity_search(query, k=k)
 
 
 def format_retrieved_context(docs: List[Document]) -> str:

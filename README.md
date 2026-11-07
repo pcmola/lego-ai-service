@@ -4,7 +4,8 @@
 
 레고 창작 설계용 Multi-Agent 기반 에이전트 프로젝트입니다.  
 사용자가 만들고 싶은 레고 작품의 컨셉·크기·용도 등을 입력하면, 여러 에이전트가 협업하여 <br/>
-**요구사항 분석 → 구조 설계 → 최종 가이드 생성**까지 자동으로 수행합니다.
+**요구사항 분석 → 구조 설계 → 최종 가이드 생성**까지 자동으로 수행하고,<br/>
+**완성 예상 이미지와 층별 조립 도안**까지 그려 줍니다.
 
 ---
 
@@ -13,10 +14,28 @@
 - **Multi-Agent + LangGraph** 워크플로우
 - **RAG 기반 지식 검색** (레고 기초 문서)
 - **Rebrickable API**로 브릭/부품 이미지 자동 조회
+- **완성 예상 이미지** (gpt-image) + **층별 조립 도안** (구조화 출력 → 검증 → SVG 평면도)
 - **Streamlit** 기반 웹 UI (로컬 브라우저 실행)
 - **Azure OpenAI (Foundry)**
-  - Chat: `gpt-4.1-mini`, `gpt-4.1`
+  - Chat: `gpt-5.6-luna` (기본), `gpt-6-sol` (고성능)
   - Embedding: `text-embedding-3-*`
+  - Image: `gpt-image-2` (선택)
+
+---
+
+## 🆕 v0.3 변경 사항
+
+> 이전 버전(v0.2 계열)은 [`release/v0.2`](https://github.com/pcmola/lego-ai-service/tree/release/v0.2) 브랜치에 보존되어 있습니다.
+
+| 구분 | 내용 |
+| --- | --- |
+| 모델 | Chat 기본 `gpt-4.1-mini` → **`gpt-5.6-luna`**, 고성능 `gpt-4.1` → **`gpt-6-sol`** |
+| 모델 설정 | 변수명을 용도 기준으로 변경 (`AOAI_DEPLOY_CHAT` / `AOAI_DEPLOY_CHAT_PRO`, 구 변수명도 인식)<br/>`AOAI_PRO_AGENTS` 로 에이전트별 고성능 모델 지정 (예: `DESIGN,BLUEPRINT`)<br/>`AOAI_TEMPERATURE` 신설 — gpt-5.x 이상 추론형 모델은 비워 둘 것 (0.7 등 지정 시 400 오류) |
+| 신규 기능 | **완성 예상 이미지** (gpt-image) · **층별 조립 도안** (구조화 출력 → 범위/겹침/지지 검증 → SVG 평면도 + 부품 수량표) |
+| 응답성 | 에이전트 단계별 진행 표시 + 최종 정리 답변 **실시간 스트리밍**<br/>이미지·도안을 부품 표(Rebrickable 조회)와 **병렬 생성**<br/>**⏹ 중지 버튼** (어느 단계에서든 1초 내 중지, 직전 결과 유지) |
+| 성능 | 벡터스토어 재사용(검색마다 재생성 X), Rebrickable 404 부품 재조회 방지 |
+| 의존성 | 미사용 `langchain`, `langchain-community`, `chromadb`(직접 명시) 제거, `langchain-core`, `requests` 명시 |
+| 실행 | `run.ps1` / `run.bat` / `run.sh` 가 `.venv` 생성 + `requirements.txt` 변경 시 자동 설치 후 실행 (전역 Python 미사용) |
 
 ---
 
@@ -53,8 +72,16 @@
 6. **브릭/부품 제안 표 생성**
    - Refiner 결과 중 “브릭/부품 제안” 섹션을 파싱
    - Rebrickable API로 각 부품의 이름·이미지를 조회 후 HTML 표로 렌더링
-7. **Streamlit UI 출력**
-   - 최종 텍스트 + 브릭/부품 표를 한 화면에 표시
+7. **완성 예상 이미지 생성** (선택, `app/utils/image_gen.py`)
+   - 최종 가이드 → 영어 이미지 프롬프트 → gpt-image 로 완성 예상 이미지 생성
+   - ※ 분위기용 예상 이미지이며 실제 부품 구성과 다를 수 있음
+8. **층별 조립 도안 생성** (`app/utils/blueprint.py`)
+   - LLM 구조화 출력으로 층별 브릭 좌표/크기/색/부품 번호 생성 (바닥 16x16 · 8층 · 150개 이내)
+   - 격자 밖·겹침 브릭 제외, 아래층에 받쳐지지 않은 브릭은 빨간 점선으로 표시
+   - 층별 SVG 평면도(아래층 위치 음영 표시) + 부품 수량 요약표
+9. **Streamlit UI 출력**
+   - 단계별 진행 상태 + 최종 답변 실시간 스트리밍, 실행 중 ⏹ 중지 가능
+   - 최종 텍스트 + 브릭/부품 표 + (탭) 조립 도안 / 완성 예상 이미지
 
 ---
 
@@ -98,9 +125,13 @@ flowchart TB
     T["🧱 브릭/부품 HTML 표 렌더링<br/>(app/components/brick_table.py)"]:::rag
 
     Out["✅ 최종 설계 결과 + 브릭 제안 표 출력<br/>(Streamlit 화면)"]:::output
+    IMG["🖼️ 완성 예상 이미지<br/>(app/utils/image_gen.py)"]:::output
+    BP["📐 층별 조립 도안<br/>(app/utils/blueprint.py)"]:::output
 
     %% ===================== 플로우 =====================
     Input --> Start --> A1 --> A2 --> A3 --> P --> Rb --> T --> Out
+    A3 -. 병렬 .-> IMG --> Out
+    A3 -. 병렬 .-> BP --> Out
 
     A1 --> RAG
     A2 --> RAG
@@ -112,6 +143,7 @@ flowchart TB
 - Refiner 결과 안의 "브릭/부품 제안"”" 섹션을 main.py에서 따로 파싱합니다.
 - 각 행의 부품 번호를 기준으로 Rebrickable API 를 호출해 이미지·영문명 등을 채웁니다.
 - brick_table.py에서 HTML 테이블을 생성해 Streamlit에서 스크롤 가능한 표로 렌더링합니다.
+- 최종 답변이 나오는 즉시 **완성 예상 이미지**와 **층별 조립 도안** 생성을 백그라운드로 시작하여, 부품 표 조회와 병렬로 진행합니다.
 
 ---
 
@@ -157,7 +189,7 @@ flowchart TB
   subgraph AZURE[ ]
     direction TB
     E([Azure OpenAI<br/>Embeddings]):::service
-    LLM([Azure OpenAI<br/>LLM<br/>gpt-4.1-mini · gpt-4.1]):::service
+    LLM([Azure OpenAI<br/>LLM<br/>gpt-5.6-luna · gpt-6-sol]):::service
   end
 
   %% ───────── 지식 / 저장소 ─────────
@@ -314,14 +346,20 @@ lego-ai-service/
 │  │  ├─ knowledge/               # 레고 지식 Markdown 문서들 (*.md)
 │  │  └─ chroma_db/               # 최초 실행 시 자동 생성되는 벡터 DB
 │  └─ utils/
-│     ├─ config.py                # Azure OpenAI LLM/Embedding 팩토리
-│     └─ rebrickable_client.py    # Rebrickable API 클라이언트
+│     ├─ config.py                # Azure OpenAI LLM/Embedding/Image 설정, 에이전트별 모델 선택
+│     ├─ rebrickable_client.py    # Rebrickable API 클라이언트
+│     ├─ image_gen.py             # 완성 예상 이미지 생성 (gpt-image)
+│     └─ blueprint.py             # 층별 조립 도안 생성/검증/SVG 렌더링
 │
 ├─ images/                        # README용 스크린샷/이미지
 ├─ mermaid/                       # (선택) 다이어그램 원본 .mmd 파일
 │
+├─ .streamlit/config.toml         # Streamlit 서버/브라우저 설정
+│
 ├─ .env.example                   # 환경변수 템플릿
 ├─ .gitignore
+├─ .gitattributes                 # *.sh 는 LF 고정
+├─ run.ps1 / run.bat / run.sh     # .venv 준비 + 자동 설치 + 실행
 ├─ Dockerfile
 ├─ docker-compose.yml             # 로컬 개발용 docker-compose 설정
 ├─ requirements.txt
@@ -333,7 +371,7 @@ lego-ai-service/
 
 | 모듈 경로                     | 역할 요약                                                  |
 | ----------------------------- | ---------------------------------------------------------- |
-| `app/main.py`                 | Streamlit 메인 실행, LangGraph 호출, 결과 & 브릭 표 렌더링 |
+| `app/main.py`                 | Streamlit 메인 실행, LangGraph 스트리밍 호출/중지, 결과 & 브릭 표 렌더링, 이미지·도안 병렬 생성 |
 | `components/sidebar.py`       | 사용자 입력 UI, 입력값을 LegoState로 변환                  |
 | `components/brick_table.py`   | 브릭 제안 파싱, Rebrickable API 조회, HTML 표 생성         |
 | `utils/rebrickable_client.py` | Rebrickable API 호출(부품 번호/이름/이미지 조회)           |
@@ -341,7 +379,9 @@ lego-ai-service/
 | `workflow/graph.py`           | Multi-Agent 실행 플로우 구성 (Req → Design → Refiner)      |
 | `workflow/agents/*`           | 세부 에이전트 구현 (요구/설계/정리)                        |
 | `retrieval/vector_store.py`   | Chroma 기반 RAG 검색 엔진 구성                             |
-| `utils/config.py`             | Azure OpenAI 설정 로드, LLM/Embeddings 선택 함수 제공      |
+| `utils/config.py`             | Azure OpenAI 설정 로드, LLM/Embeddings/Image 설정, 에이전트별 모델 선택 (`get_llm_for_agent`) |
+| `utils/image_gen.py`          | 최종 가이드 → 이미지 프롬프트 → gpt-image 완성 예상 이미지 |
+| `utils/blueprint.py`          | 층별 조립 도안: 구조화 출력 → 검증(범위/겹침/지지) → SVG 렌더링 |
 
 ## 📌 6. 환경변수 설정 (.env 예시)
 
@@ -355,15 +395,28 @@ AOAI_API_KEY=YOUR_AOAI_KEY
 AOAI_API_VERSION=2024-02-01
 
 # == Chat 모델 배포 ==
-# 기본 모델 (mini)
-AOAI_DEPLOY_GPT4O_MINI=gpt-4.1-mini
+# 기본 모델 (빠르고 저렴)
+AOAI_DEPLOY_CHAT=gpt-5.6-luna
 # 고성능 모델
-AOAI_DEPLOY_GPT4O=gpt-4.1
+AOAI_DEPLOY_CHAT_PRO=gpt-6-sol
+# 고성능 모델을 쓸 에이전트 (쉼표 구분: REQUIREMENTS, DESIGN, REFINER, BLUEPRINT(조립 도안) / 비우면 전부 기본 모델)
+AOAI_PRO_AGENTS=
+
+# LLM temperature (비우면 모델 기본값 사용, gpt-5.x 이상은 비워 둘 것)
+AOAI_TEMPERATURE=
 
 # == Embedding 모델 배포 ==
 AOAI_DEPLOY_EMBED_3_LARGE=text-embedding-3-large
 AOAI_DEPLOY_EMBED_3_SMALL=
 AOAI_DEPLOY_EMBED_ADA=
+
+# == 이미지 생성 (완성 예상 이미지, 선택) ==
+# 비우면 이미지 기능 비활성화. 엔드포인트/키를 비우면 AOAI_ENDPOINT / AOAI_API_KEY 사용
+AOAI_DEPLOY_IMAGE=gpt-image-2
+AOAI_IMAGE_ENDPOINT=https://<image-resource>.services.ai.azure.com/
+AOAI_IMAGE_API_KEY=YOUR_KEY
+AOAI_IMAGE_API_VERSION=2025-04-01-preview
+AOAI_IMAGE_QUALITY=low
 
 # == Rebrickable API ==
 REBRICKABLE_API_KEY=YOUR_REBRICKABLE_KEY
@@ -387,19 +440,18 @@ REBRICKABLE_API_BASE=https://rebrickable.com/api/v3
 git clone https://github.com/pcmola/lego-ai-service.git
 cd lego-ai-service
 
-python -m venv .venv
-# Windows PowerShell
-#   .venv\Scripts\Activate.ps1
-# macOS / Linux
-#   source .venv/bin/activate
-
-pip install -r requirements.txt
-
 cp .env.example .env
 # .env 파일을 열어 Azure OpenAI / Rebrickable 설정값 수정
 
-streamlit run app/main.py
+# Windows (PowerShell / cmd)
+./run.ps1        # 또는 run.bat
+# Git Bash / macOS / Linux
+./run.sh
 ```
+
+- run 스크립트가 `.venv` 생성과 `requirements.txt` 설치를 자동으로 처리합니다.
+  - `.venv` 가 없으면 새로 만들고, `requirements.txt` 가 바뀌면 다시 설치합니다.
+  - 항상 `.venv` 의 Python 으로 실행하며 전역 Python 은 사용하지 않습니다.
 
 - Streamlit 앱 실행 후 브라우저에서 아래 주소로 접속합니다.
   - ➡ <http://localhost:8501>
@@ -450,9 +502,9 @@ python test_azure_openai.py
 ### 테스트 내용
 
 - test_azure_openai.py는 다음 항목을 점검합니다:
-  - 기본 LLM 테스트 (gpt-4.1-mini)
+  - 기본 LLM 테스트 (gpt-5.6-luna)
   - 간단한 질문을 보내 응답이 정상적으로 반환되는지 확인
-- 고성능 LLM 테스트 (gpt-4.1)
+- 고성능 LLM 테스트 (gpt-6-sol)
   - 모델 배포명이 .env와 일치하는지 검증
 - Embedding 모델 테스트 (text-embedding-3-large)
   - 벡터 길이 및 생성 여부 확인
@@ -468,7 +520,7 @@ python test_azure_openai.py
   - AOAI_ENDPOINT
   - AOAI_API_KEY
   - AOAI_API_VERSION
-  - AOAI_DEPLOY_GPT4O_MINI, AOAI_DEPLOY_GPT4O
+  - AOAI_DEPLOY_CHAT, AOAI_DEPLOY_CHAT_PRO (구 변수명 AOAI_DEPLOY_GPT4O_MINI / AOAI_DEPLOY_GPT4O 도 인식)
   - AOAI_DEPLOY_EMBED_3_LARGE
 - 네트워크 또는 방화벽 정책
 - Azure OpenAI 리소스 모델 배포명 오타 여부
@@ -477,8 +529,15 @@ python test_azure_openai.py
 
 ## 📌 9. TODO (향후 개선 예정)
 
+- [x] 최신 모델 적용 (gpt-5.6-luna / gpt-6-sol) 및 에이전트별 모델 지정
+- [x] 응답 스트리밍 · 진행 표시 · 중지 버튼
+- [x] 완성 예상 이미지 / 층별 조립 도안 (v1)
+- [ ] 도안 부품 번호 ↔ 크기 일치 검증 (Rebrickable 데이터 활용)
+- [ ] 최종 정리(Refiner) 출력 축소로 전체 응답 시간 단축
+- [ ] 3D 뷰어 (LDraw + three.js) 검토
+- [ ] `components.html` → `st.iframe` 전환 (Streamlit 사용 중지 예정 API)
 - [ ] 브릭/부품 제안 파싱 정확도 개선
-- [ ] Rebrickable API 캐싱 및 대체 파트 처리 강화
+- [ ] Rebrickable API 캐싱 및 대체 파트 처리 강화 (404 재조회 방지는 반영)
 - [ ] 브릭 표 기능 고도화 (색상/수량 인식)
 - [ ] RAG 지식 문서 확장
 - [ ] Streamlit UI 개선 (히스토리, Export 기능)

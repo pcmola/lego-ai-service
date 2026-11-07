@@ -1,5 +1,6 @@
 import os
 import re
+import time
 import textwrap
 import logging
 from logging.handlers import RotatingFileHandler
@@ -403,6 +404,204 @@ def render_answer_with_brick_table(answer: str) -> None:
         st.markdown(after_clean)
 
 
+AGENT_STEPS = [
+    ("requirements_agent", "요구사항 분석"),
+    ("design_agent", "설계 생성"),
+    ("refiner_agent", "최종 정리"),
+]
+
+
+def run_agents_streaming(goal: str, sidebar_state: Dict[str, Any]) -> str:
+    """LangGraph를 스트리밍으로 실행.
+
+    - 단계(에이전트)가 끝날 때마다 진행 상태를 갱신
+    - 마지막 '최종 정리' 에이전트의 답변은 토큰 단위로 바로 화면에 표시
+    성공 시 최종 답변, 실패 시 빈 문자열 반환
+    """
+    graph = get_graph()
+    user_input = build_user_input(goal, sidebar_state)
+    logger.info("[main] 사용자 입력:\n%s", user_input)
+
+    initial_state: LegoState = {
+        "user_input": user_input,
+        "messages": [],
+        "docs": {},
+        "contexts": {},
+        "current_step": "START",
+        "prev_node": "",
+    }
+
+    node_index = {name: i for i, (name, _) in enumerate(AGENT_STEPS)}
+    total = len(AGENT_STEPS)
+    final_node = AGENT_STEPS[-1][0]
+
+    status = st.status(f"{AGENT_STEPS[0][1]} 중... (1/{total})", expanded=False)
+    live = st.empty()  # 최종 정리 답변 실시간 표시용
+
+    started = time.perf_counter()
+    streamed = ""
+    answer = ""
+    step_chars = 0          # 현재 단계에서 생성된 글자 수 (진행 표시용)
+    last_ui = 0.0
+
+    try:
+        for mode, chunk in graph.stream(initial_state, stream_mode=["updates", "messages"]):
+            if mode == "messages":
+                msg, meta = chunk
+                node = meta.get("langgraph_node")
+                if not (isinstance(msg.content, str) and msg.content):
+                    continue
+                if node == final_node:
+                    streamed += msg.content
+                    live.markdown(streamed + " ▌")
+                elif node in node_index:
+                    # 중간 단계도 진행 상황을 주기적으로 갱신
+                    # (Streamlit은 화면 갱신 시점에만 중지 요청을 확인하므로, 중지 반응성 확보 목적도 있음)
+                    step_chars += len(msg.content)
+                    now = time.perf_counter()
+                    if now - last_ui > 0.5:
+                        last_ui = now
+                        i = node_index[node]
+                        status.update(label=f"{AGENT_STEPS[i][1]} 중... ({i + 1}/{total}) · {step_chars:,}자 작성 · {now - started:.0f}초")
+                continue
+
+            # mode == "updates": 노드 하나가 끝남
+            for node, update in chunk.items():
+                if node not in node_index:
+                    continue
+                idx = node_index[node]
+                elapsed = time.perf_counter() - started
+                status.write(f"✅ {AGENT_STEPS[idx][1]} 완료 ({elapsed:.0f}초)")
+                logger.info("[main] %s 완료 (%.1fs)", node, elapsed)
+                step_chars = 0
+
+                if node == final_node:
+                    answer = (update or {}).get("final_answer", "") or streamed
+                elif idx + 1 < total:
+                    nxt = AGENT_STEPS[idx + 1][1]
+                    hint = " — 답변이 아래에 실시간으로 표시됩니다" if idx + 1 == total - 1 else ""
+                    status.update(label=f"{nxt} 중... ({idx + 2}/{total}){hint}")
+
+        elapsed = time.perf_counter() - started
+        if not answer:
+            answer = "결과를 생성하지 못했습니다."
+        status.update(label=f"완료 ({elapsed:.0f}초)", state="complete")
+        logger.info("[main] LangGraph 실행 완료 (%.1fs). 최종 답변 길이: %d", elapsed, len(answer))
+        live.empty()  # 실시간 미리보기는 지우고, 아래에서 브릭 표 포함 최종 렌더링
+        return answer
+
+    except Exception as e:
+        # 여기서 보는 스택트레이스는 Azure content filter 걸릴 때 나는 예외입니다.
+        # 코드 문제는 아니고, 답변 내용이 필터에 걸리면 Azure 쪽에서 에러를 줍니다.
+        logger.exception("[main] LangGraph 에이전트 호출 중 예외 발생")
+        status.update(label="오류 발생", state="error")
+        live.empty()
+        st.error(f"에이전트 호출 중 오류가 발생했습니다: {e}")
+        return ""
+
+
+def _show_image(slot, data: Dict[str, Any]) -> None:
+    with slot.container():
+        if data.get("error"):
+            st.warning(f"완성 예상 이미지를 만들지 못했습니다: {data['error']}")
+            return
+        st.image(data["png"], width="stretch")
+        st.caption("⚠️ AI가 그린 **예상 이미지**입니다. 실제 부품 구성·도안과 다를 수 있습니다.")
+        with st.expander("이미지 생성에 사용한 프롬프트"):
+            st.code(data.get("prompt", ""), language=None, wrap_lines=True)
+
+
+def _show_blueprint(slot, data: Dict[str, Any]) -> None:
+    with slot.container():
+        if data.get("error"):
+            st.warning(f"조립 도안을 만들지 못했습니다: {data['error']}")
+            return
+        st.caption(f"📐 {data['summary']} · 브릭에 마우스를 올리면 크기/색/부품 번호가 보입니다.")
+        for w in data.get("warnings", []):
+            st.warning(w, icon="⚠️")
+        components.html(data["html"], height=data["height"], scrolling=True)
+
+
+VISUAL_LABELS = {"blueprint": "층별 조립 도안", "image": "완성 예상 이미지"}
+
+
+def start_visuals(answer: str) -> Dict[str, Any]:
+    """이미지(A)/도안(B) 생성을 백그라운드 스레드에서 즉시 시작.
+    (부품 표 렌더링 - Rebrickable 조회 - 과 병렬로 진행되도록 가이드 렌더링 전에 호출)
+    반환: {"futures": {Future: name}, "started": t}
+    """
+    from concurrent.futures import ThreadPoolExecutor
+    from utils import image_gen
+    from utils.blueprint import build_blueprint
+
+    def make_image(text: str) -> Dict[str, Any]:
+        png, prompt = image_gen.generate_preview(text)
+        return {"png": png, "prompt": prompt}
+
+    jobs = {"blueprint": build_blueprint}
+    if image_gen.is_enabled():
+        jobs["image"] = make_image
+
+    pool = ThreadPoolExecutor(max_workers=len(jobs))
+    futures = {pool.submit(fn, answer): name for name, fn in jobs.items()}
+    pool.shutdown(wait=False)  # 작업은 계속 진행, 결과는 render_visuals 에서 수집
+    return {"futures": futures, "started": time.perf_counter()}
+
+
+def render_visuals(pending: Optional[Dict[str, Any]] = None) -> None:
+    """완성 예상 이미지(A)와 층별 조립 도안(B) 표시.
+
+    pending 이 있으면(새로 생성 중) 끝나는 순서대로 표시하며 session_state 에 저장,
+    없으면(재실행) session_state 에 저장된 결과만 다시 표시.
+    """
+    from concurrent.futures import FIRST_COMPLETED, wait
+    from utils import image_gen
+
+    visuals: Dict[str, Any] = st.session_state.visuals
+    image_on = image_gen.is_enabled()
+
+    tab_bp, tab_img = st.tabs(["📐 층별 조립 도안", "🖼️ 완성 예상 이미지"])
+    with tab_bp:
+        bp_slot = st.empty()
+    with tab_img:
+        img_slot = st.empty()
+
+    if not image_on:
+        img_slot.info("이미지 모델이 설정되지 않았습니다 (.env 의 AOAI_DEPLOY_IMAGE).")
+
+    slots = {"blueprint": (bp_slot, _show_blueprint), "image": (img_slot, _show_image)}
+
+    if not pending:
+        if "blueprint" in visuals:
+            _show_blueprint(bp_slot, visuals["blueprint"])
+        else:
+            bp_slot.caption("설계 제안을 새로 받으면 조립 도안이 생성됩니다.")
+        if image_on and "image" in visuals:
+            _show_image(img_slot, visuals["image"])
+        return
+
+    futures = dict(pending["futures"])
+    started = pending["started"]
+
+    # 0.5초마다 경과 시간 갱신 (진행 표시 + 중지 요청 반응성 확보), 끝나는 순서대로 표시
+    while futures:
+        done, _ = wait(futures, timeout=0.5, return_when=FIRST_COMPLETED)
+        for fut in done:
+            name = futures.pop(fut)
+            slot, show = slots[name]
+            try:
+                data = fut.result()
+            except Exception as e:
+                logger.exception("[main] %s 생성 실패", VISUAL_LABELS[name])
+                data = {"error": str(e)[:300]}
+            logger.info("[main] %s 완료 (%.1fs)", VISUAL_LABELS[name], time.perf_counter() - started)
+            visuals[name] = data
+            show(slot, data)
+        elapsed = time.perf_counter() - started
+        for name in futures.values():
+            slots[name][0].info(f"⏳ {VISUAL_LABELS[name]}을(를) 만드는 중입니다... ({elapsed:.0f}초)")
+
+
 # ------------------------------------------------------------
 # Streamlit 메인 UI
 # ------------------------------------------------------------
@@ -435,6 +634,12 @@ def main() -> None:
 
     with col1:
         generate_button = st.button("🚀 레고 설계 제안 받기", type="primary")
+        stop_slot = st.empty()
+        if generate_button:
+            # 실행 중에만 보이는 중지 버튼: 누르면 Streamlit이 현재 실행을 중단하고 다시 실행함
+            # (작업이 모두 끝나면 아래에서 stop_slot.empty() 로 제거)
+            stop_slot.button("⏹ 중지", key="stop_btn",
+                             on_click=lambda: st.session_state.update(stopped=True))
 
     with col2:
         st.info(
@@ -446,45 +651,35 @@ def main() -> None:
 
     if "lego_response" not in st.session_state:
         st.session_state.lego_response = ""
-
-    if generate_button:
-        with st.spinner("LangGraph 에이전트들이 레고 창작 아이디어를 구상 중입니다..."):
-            try:
-                graph = get_graph()
-                user_input = build_user_input(goal, sidebar_state)
-
-                logger.info("[main] 사용자 입력:\n%s", user_input)
-
-                initial_state: LegoState = {
-                    "user_input": user_input,
-                    "messages": [],
-                    "docs": {},
-                    "contexts": {},
-                    "current_step": "START",
-                    "prev_node": "",
-                }
-
-                result_state: Dict[str, Any] = graph.invoke(initial_state)
-                answer = result_state.get("final_answer") or "결과를 생성하지 못했습니다."
-
-                logger.info(
-                    "[main] LangGraph 실행 완료. 최종 답변 길이: %d",
-                    len(answer),
-                )
-
-                st.session_state.lego_response = answer
-            except Exception as e:
-                # 여기서 보는 스택트레이스는 Azure content filter 걸릴 때 나는 예외입니다.
-                # 코드 문제는 아니고, 답변 내용이 필터에 걸리면 Azure 쪽에서 에러를 줍니다.
-                logger.exception("[main] LangGraph 에이전트 호출 중 예외 발생")
-                st.error(f"에이전트 호출 중 오류가 발생했습니다: {e}")
+    if "visuals" not in st.session_state:
+        st.session_state.visuals = {}
 
     st.markdown("### 3️⃣ AI 레고 창작 가이드")
 
-    if st.session_state.lego_response:
-        render_answer_with_brick_table(st.session_state.lego_response)
-    else:
+    if st.session_state.pop("stopped", False):
+        logger.info("[main] 사용자가 요청을 중지함")
+        st.info("⏹ 요청을 중지했습니다. 아래에는 직전 결과가 표시됩니다.")
+
+    pending = None
+    if generate_button:
+        answer = run_agents_streaming(goal, sidebar_state)
+        if answer:
+            st.session_state.lego_response = answer
+            st.session_state.visuals = {}  # 새 답변이 나왔을 때만 이전 이미지/도안 초기화 (중지 시 직전 결과 유지)
+            # 이미지/도안 생성을 먼저 백그라운드로 시작 → 아래 부품 표(Rebrickable 조회)와 병렬 진행
+            pending = start_visuals(answer)
+
+    if not st.session_state.lego_response:
+        stop_slot.empty()
         st.caption("아직 결과가 없습니다. 왼쪽 설정을 조정하고 위의 버튼을 눌러보세요.")
+        return
+
+    render_answer_with_brick_table(st.session_state.lego_response)
+
+    # 4️⃣ 가이드 아래에 이미지/도안 표시 (사용자는 가이드를 읽으며 대기)
+    st.markdown("### 4️⃣ 완성 예상 이미지 · 층별 조립 도안")
+    render_visuals(pending)
+    stop_slot.empty()  # 모든 작업 완료 → 중지 버튼 제거
 
 
 if __name__ == "__main__":

@@ -23,6 +23,7 @@ class RebrickableClient:
 
     # 아주 단순한 메모리 캐시 (프로세스 살아있는 동안만 유지)
     _part_cache: Dict[str, Dict[str, Any]] = {}
+    _not_found: set = set()  # 404 응답 URL (클래스 공유)
     _last_call_ts: float = 0.0
 
     def __init__(self) -> None:
@@ -69,6 +70,9 @@ class RebrickableClient:
             logger.exception("[RebrickableClient] 요청 예외: %s (%s)", url, e)
             return None
 
+        if resp.status_code == 404:
+            # 존재하지 않는 부품은 기억해 두고 재조회하지 않음 (일시 오류는 다음에 재시도)
+            self._not_found.add(url)
         if resp.status_code != 200:
             logger.info(
                 "[RebrickableClient] GET 실패: %s status=%s, body=%s",
@@ -104,6 +108,8 @@ class RebrickableClient:
             return self._part_cache[part_num]
 
         url = f"{self.BASE_URL}/parts/{part_num}/"
+        if url in self._not_found:
+            return None
         data = self._get(url)
         if data:
             self._part_cache[part_num] = data

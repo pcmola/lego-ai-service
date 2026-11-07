@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Dict, Any, List
 
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage, BaseMessage
-from utils.config import get_llm
+from utils.config import get_llm_for_agent
 from workflow.state import LegoState, AgentRole
 from retrieval.vector_store import search_lego_info, format_retrieved_context
 
@@ -13,7 +13,7 @@ class BaseLegoAgent(ABC):
     def __init__(self, role: str, k: int = 4):
         self.role = role
         self.k = k
-        self.llm = get_llm()
+        self.llm = get_llm_for_agent(role)
 
     # --- 추상 메서드 (각 에이전트에서 구현) ---
 
